@@ -18,6 +18,7 @@
   let platform = "Desktop";
   let toast = "";
   let toastKind: "good" | "bad" = "good";
+  let toastTimeout: ReturnType<typeof setTimeout> | undefined;
   let loading = false;
   let servers: PublicServer[] = [];
   let cursor: string | null = null;
@@ -37,11 +38,27 @@
     activePlaceId = selectedId;
     liteMode = readLiteMode();
     platformName().then(value => platform = value).catch(() => platform = "Desktop");
+    // Prevent a pending notification callback from outliving the desktop window.
+    return () => {
+      if (toastTimeout) clearTimeout(toastTimeout);
+    };
   });
 
+  function dismissToast() {
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = undefined;
+    toast = "";
+  }
+
   function notice(message: string, kind: "good" | "bad" = "good") {
+    // A new notification must reset the timer for the previous one.
+    if (toastTimeout) clearTimeout(toastTimeout);
     toast = message;
     toastKind = kind;
+    toastTimeout = setTimeout(() => {
+      toast = "";
+      toastTimeout = undefined;
+    }, kind === "bad" ? 8000 : 3500);
   }
 
   function persist() {
@@ -314,6 +331,6 @@
     </div>
   </main>
   {#if toast}
-    <div class:bad={toastKind === "bad"} class="toast" role="status"><span>{toastKind === "bad" ? "!" : "✓"}</span>{toast}<button aria-label="Dismiss notification" onclick={() => toast = ""}>×</button></div>
+    <div class:bad={toastKind === "bad"} class="toast" role="status"><span>{toastKind === "bad" ? "!" : "✓"}</span>{toast}<button aria-label="Dismiss notification" onclick={dismissToast}>×</button></div>
   {/if}
 </div>
