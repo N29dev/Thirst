@@ -3,8 +3,23 @@ import type { SavedGame } from "./types";
 const STORAGE_KEY = "thirst.library.v1";
 const SETTINGS_KEY = "thirst.preferences.v1";
 
-// This store is exclusively for non-sensitive UI preferences and public place IDs.
-// Authentication credentials MUST NEVER be added here.
+// Only public game metadata/preferences belong here. NEVER write tokens or cookies.
+export function validPlaceId(id: number): boolean {
+  return Number.isSafeInteger(id) && id > 0;
+}
+
+export function isTrustedIconUrl(value: unknown): value is string {
+  if (typeof value !== "string" || value.length > 1200) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" &&
+      (url.hostname === "rbxcdn.com" || url.hostname.endsWith(".rbxcdn.com")) &&
+      !url.username && !url.password && url.port === "";
+  } catch {
+    return false;
+  }
+}
+
 export function readLibrary(): SavedGame[] {
   try {
     const data: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
@@ -18,6 +33,9 @@ export function readLibrary(): SavedGame[] {
       placeId: game.placeId,
       name: game.name,
       addedAt: Number.isFinite(game.addedAt) ? game.addedAt : Date.now(),
+      universeId: validPlaceId(game.universeId ?? 0) ? game.universeId : undefined,
+      rootPlaceId: validPlaceId(game.rootPlaceId ?? 0) ? game.rootPlaceId : undefined,
+      iconUrl: isTrustedIconUrl(game.iconUrl) ? game.iconUrl : undefined,
       subplaces: game.subplaces.slice(0, 100).filter(
         place => validPlaceId(place.placeId) &&
           typeof place.name === "string" && place.name.length <= 100
@@ -40,12 +58,7 @@ export function writeLiteMode(enabled: boolean): void {
   localStorage.setItem(SETTINGS_KEY, enabled ? "lite" : "full");
 }
 
-export function validPlaceId(id: number): boolean {
-  return Number.isSafeInteger(id) && id > 0;
-}
-
 export function parsePlaceId(text: string): number | null {
-  // Accept a numeric place ID or an official Roblox game URL.
   const raw = text.trim();
   const match = raw.match(/^https:\/\/(?:www\.)?roblox\.com\/games\/(\d+)(?:[/?#].*)?$/i);
   const value = /^\d+$/.test(raw) ? raw : match?.[1];

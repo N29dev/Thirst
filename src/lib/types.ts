@@ -8,6 +8,27 @@ export type SavedGame = {
   name: string;
   subplaces: SavedPlace[];
   addedAt: number;
+  universeId?: number;
+  rootPlaceId?: number;
+  iconUrl?: string;
+};
+
+export type GameMetadata = {
+  universeId: number;
+  rootPlaceId: number;
+  name: string;
+  playing: number | null;
+  iconUrl: string | null;
+};
+
+export type DiscoveredPlace = {
+  id: number;
+  name: string;
+};
+
+export type SubplacesPage = {
+  data: DiscoveredPlace[];
+  nextPageCursor: string | null;
 };
 
 export type PublicServer = {
