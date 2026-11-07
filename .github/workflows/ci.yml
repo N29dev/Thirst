@@ -27,6 +27,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Validate bundled icon pixel data
+        run: python scripts/check_icons.py
       - uses: dtolnay/rust-toolchain@stable
       - name: Check Rust
         run: cargo check --manifest-path src-tauri/Cargo.toml
