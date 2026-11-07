@@ -13,9 +13,9 @@ This document tracks features requested during the first successful macOS alpha 
 
 ## Alpha 0.2 — Polished library and navigation
 
-- [ ] Compact favorite-game icon strip / quick-launch grid on Overview.
-- [ ] Retrieve official game icons and names using public Roblox metadata endpoints; cache locally and lazy-load.
-- [ ] Automatically discover available subplaces where Roblox exposes them; manual IDs remain available as a fallback.
+- [x] Compact favorite-game icon grid on Overview, with launch and server buttons.
+- [x] Retrieve official Roblox game names/icons when saving, store the validated CDN icon URL locally; existing bookmarks support explicit metadata refresh (no background polling).
+- [x] On-demand public subplace discovery with paging and a Save action; manual IDs remain available as a fallback.
 - [ ] Soft pointer-following light/hover effect on actionable cards, using CSS-only or requestAnimationFrame and honoring reduced-motion and Lite Mode settings.
 - [ ] Sort saved games, recent games, pinned subplaces and recent server joins.
 - [ ] Toast notifications have accessible dismissal and auto-hide; verify no overlap with game launch.
