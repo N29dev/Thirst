@@ -114,12 +114,193 @@ async fn list_public_servers(
         .map_err(|_| "Roblox returned an unexpected server response.".to_owned())
 }
 
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UniverseLookup {
+    universe_id: u64,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GameInfo {
+    root_place_id: u64,
+    name: String,
+    #[serde(default)]
+    playing: Option<u64>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct GamesEnvelope {
+    data: Vec<GameInfo>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Thumbnail {
+    image_url: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct ThumbnailsEnvelope {
+    data: Vec<Thumbnail>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GameMetadata {
+    universe_id: u64,
+    root_place_id: u64,
+    name: String,
+    playing: Option<u64>,
+    icon_url: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct DiscoveredPlace {
+    id: u64,
+    name: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SubplacesPage {
+    data: Vec<DiscoveredPlace>,
+    next_page_cursor: Option<String>,
+}
+
+fn public_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(9))
+        .redirect(reqwest::redirect::Policy::none())
+        .user_agent("Thirst/0.1 (+https://github.com/N29dev/Thirst)")
+        .build()
+        .map_err(|_| "Could not configure Roblox metadata requests.".to_owned())
+}
+
+fn validate_cursor(cursor: &str) -> Result<(), String> {
+    if cursor.is_empty() || cursor.len() > 512 || !cursor.is_ascii() {
+        return Err("Invalid pagination cursor.".to_owned());
+    }
+    Ok(())
+}
+
+// Do not permit arbitrary image URLs to reach the webview.
+// Only HTTPS content hosted on Roblox's image CDN is accepted.
+fn trusted_icon_url(url: &str) -> bool {
+    match reqwest::Url::parse(url) {
+        Ok(uri) => {
+            if uri.scheme() != "https" || uri.username() != "" || uri.password().is_some() ||
+                uri.port().is_some() {
+                return false;
+            }
+            uri.host_str().is_some_and(|host| host == "rbxcdn.com" || host.ends_with(".rbxcdn.com"))
+        }
+        Err(_) => false,
+    }
+}
+
+async fn check_public_response(
+    response: reqwest::Response,
+    feature: &str,
+) -> Result<reqwest::Response, String> {
+    match response.status().as_u16() {
+        200..=299 => Ok(response),
+        401 | 403 => Err(format!("Roblox restricted public {feature} access. Add the place manually.")),
+        429 => Err(format!("Roblox rate-limited {feature}. Please try again later.")),
+        code => Err(format!("Roblox {feature} is unavailable (HTTP {code}).")),
+    }
+}
+
+#[tauri::command]
+async fn lookup_game(place_id: u64) -> Result<GameMetadata, String> {
+    validate_place_id(place_id)?;
+    let client = public_client()?;
+
+    let universe = client
+        .get(format!("https://apis.roblox.com/universes/v1/places/{place_id}/universe"))
+        .send().await
+        .map_err(|_| "Could not reach Roblox to identify this experience.".to_owned())?;
+    let universe = check_public_response(universe, "experience lookup").await?
+        .json::<UniverseLookup>().await
+        .map_err(|_| "Roblox did not recognize this place ID.".to_owned())?;
+    validate_place_id(universe.universe_id)?;
+
+    let details = client
+        .get("https://games.roblox.com/v1/games")
+        .query(&[("universeIds", universe.universe_id.to_string())])
+        .send().await
+        .map_err(|_| "Could not retrieve Roblox experience details.".to_owned())?;
+    let mut details = check_public_response(details, "experience details").await?
+        .json::<GamesEnvelope>().await
+        .map_err(|_| "Roblox returned invalid experience details.".to_owned())?.data;
+    let game = details.pop().ok_or("No public experience details were found for that place.")?;
+    validate_place_id(game.root_place_id)?;
+
+    // Game icons are optional. A timeout, moderation delay or missing thumbnail
+    // must never prevent a game from being bookmarked.
+    let icon_url = match client
+        .get("https://thumbnails.roblox.com/v1/games/icons")
+        .query(&[
+            ("universeIds", universe.universe_id.to_string()),
+            ("size", "150x150".to_owned()),
+            ("format", "Png".to_owned()),
+            ("isCircular", "false".to_owned()),
+        ])
+        .send().await
+    {
+        Ok(response) if response.status().is_success() => {
+            response.json::<ThumbnailsEnvelope>().await.ok()
+                .and_then(|envelope| envelope.data.into_iter().next())
+                .and_then(|item| item.image_url)
+                .filter(|uri| trusted_icon_url(uri))
+        }
+        _ => None,
+    };
+
+    Ok(GameMetadata {
+        universe_id: universe.universe_id,
+        root_place_id: game.root_place_id,
+        name: game.name.chars().take(100).collect(),
+        playing: game.playing,
+        icon_url,
+    })
+}
+
+#[tauri::command]
+async fn discover_subplaces(
+    universe_id: u64,
+    cursor: Option<String>,
+) -> Result<SubplacesPage, String> {
+    validate_place_id(universe_id)?;
+    let mut query = vec![("limit", "50".to_owned())];
+    if let Some(next) = cursor {
+        validate_cursor(&next)?;
+        query.push(("cursor", next));
+    }
+    let client = public_client()?;
+    let response = client
+        .get(format!("https://develop.roblox.com/v1/universes/{universe_id}/places"))
+        .query(&query)
+        .send().await
+        .map_err(|_| "Could not reach Roblox subplace discovery.".to_owned())?;
+    let mut page = check_public_response(response, "subplace discovery").await?
+        .json::<SubplacesPage>().await
+        .map_err(|_| "Roblox returned an unexpected subplace response.".to_owned())?;
+    page.data.retain(|place| validate_place_id(place.id).is_ok());
+    page.data.truncate(50);
+    page.next_page_cursor = page.next_page_cursor.filter(|value| validate_cursor(value).is_ok());
+    Ok(page)
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             launch_place,
             list_public_servers,
+            lookup_game,
+            discover_subplaces,
             platform_name
         ])
         .run(tauri::generate_context!())
@@ -135,6 +316,14 @@ mod tests {
         assert!(make_launch_url(0, None).is_err());
         assert!(make_launch_url(u64::MAX, None).is_err());
         assert!(make_launch_url(123, Some("not-a-server-id")).is_err());
+    }
+
+    #[test]
+    fn only_trusted_roblox_cdn_icons_are_accepted() {
+        assert!(trusted_icon_url("https://tr.rbxcdn.com/123/150/150/Image/Png"));
+        assert!(!trusted_icon_url("http://tr.rbxcdn.com/123"));
+        assert!(!trusted_icon_url("https://tr.rbxcdn.com.evil.test/icon.png"));
+        assert!(!trusted_icon_url("https://name@tr.rbxcdn.com/icon.png"));
     }
 
     #[test]
