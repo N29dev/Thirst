@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fetchPublicServers, launchPlace, platformName } from "./lib/backend";
-  import { parsePlaceId, readLibrary, readLiteMode, writeLibrary, writeLiteMode } from "./lib/library";
-  import type { PublicServer, SavedGame, SavedPlace } from "./lib/types";
+  import { discoverSubplaces, fetchPublicServers, launchPlace, lookupGame, platformName } from "./lib/backend";
+  import { isTrustedIconUrl, parsePlaceId, readLibrary, readLiteMode, writeLibrary, writeLiteMode } from "./lib/library";
+  import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
 
   type Tab = "home" | "library" | "servers" | "settings";
   let tab: Tab = "home";
@@ -24,6 +24,12 @@
   let cursor: string | null = null;
   let nextCursor: string | null = null;
   let fetchedAt: Date | null = null;
+  let addingGame = false;
+  let syncingGame = false;
+  let discoveryBusy = false;
+  let discoveryAttempted = false;
+  let discoveredPlaces: DiscoveredPlace[] = [];
+  let discoveryCursor: string | null = null;
 
   $: selected = games.find(game => game.placeId === selectedId) || null;
   $: filteredGames = games.filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
@@ -65,22 +71,124 @@
     try { writeLibrary(games); } catch { notice("Couldn't save to local storage.", "bad"); }
   }
 
-  function addGame() {
-    const id = parsePlaceId(newPlaceId);
-    const name = newName.trim().slice(0, 100);
-    if (!id || !name) return notice("Enter a game name and valid Roblox place ID or URL.", "bad");
-    if (games.some(game => game.placeId === id)) return notice("This game is already in your library.", "bad");
+  async function addGame() {
+    const inputId = parsePlaceId(newPlaceId);
+    const alias = newName.trim().slice(0, 100);
+    if (!inputId) return notice("Enter a valid Roblox place ID or game URL.", "bad");
+    if (addingGame) return;
     if (games.length >= 200) return notice("Library limit reached.", "bad");
-    games = [...games, { placeId: id, name, subplaces: [], addedAt: Date.now() }];
+    addingGame = true;
+    try {
+      let metadata: GameMetadata | null = null;
+      try {
+        metadata = await lookupGame(inputId);
+      } catch (error) {
+        // Manual bookmarks should continue working if public metadata is unavailable.
+        if (!alias) return notice("Roblox lookup failed. Enter a name to save manually. " + String(error), "bad");
+      }
+      const gameId = metadata?.rootPlaceId ?? inputId;
+      if (games.some(game => game.placeId === gameId)) {
+        return notice("This experience is already saved. Add its other places in the subplace section.", "bad");
+      }
+      const game: SavedGame = {
+        placeId: gameId,
+        name: alias || metadata?.name || "Unnamed experience",
+        subplaces: inputId !== gameId ? [{ placeId: inputId, name: "Originally selected place" }] : [],
+        addedAt: Date.now(),
+        universeId: metadata?.universeId,
+        rootPlaceId: metadata?.rootPlaceId,
+        iconUrl: isTrustedIconUrl(metadata?.iconUrl) ? metadata.iconUrl : undefined
+      };
+      games = [...games, game];
+      persist();
+      selectGame(gameId);
+      newName = "";
+      newPlaceId = "";
+      notice(metadata ? "Experience and official Roblox icon saved." : "Saved manually; metadata can be synced later.");
+    } finally {
+      addingGame = false;
+    }
+  }
+
+  async function syncSelectedGame() {
+    const id = selectedId;
+    if (!id || syncingGame) return;
+    syncingGame = true;
+    try {
+      const metadata = await lookupGame(id);
+      if (selectedId !== id) return;
+      games = games.map(game => game.placeId === id ? {
+        ...game, universeId: metadata.universeId, rootPlaceId: metadata.rootPlaceId,
+        iconUrl: isTrustedIconUrl(metadata.iconUrl) ? metadata.iconUrl : game.iconUrl
+      } : game);
+      persist();
+      notice("Official game icon and metadata updated.");
+    } catch (error) {
+      notice("Could not sync metadata: " + String(error), "bad");
+    } finally {
+      syncingGame = false;
+    }
+  }
+
+  async function discoverPlaces(loadMore = false) {
+    const id = selectedId;
+    const selectedGame = games.find(game => game.placeId === id);
+    if (!id || !selectedGame || discoveryBusy) return;
+    if (loadMore && !discoveryCursor) return;
+    discoveryBusy = true;
+    try {
+      let universeId = selectedGame.universeId;
+      if (!universeId) {
+        const metadata = await lookupGame(selectedGame.placeId);
+        if (selectedId !== id) return;
+        universeId = metadata.universeId;
+        games = games.map(game => game.placeId === id ? {
+          ...game, universeId: metadata.universeId, rootPlaceId: metadata.rootPlaceId,
+          iconUrl: isTrustedIconUrl(metadata.iconUrl) ? metadata.iconUrl : game.iconUrl
+        } : game);
+        persist();
+      }
+      const result = await discoverSubplaces(universeId, loadMore ? discoveryCursor : null);
+      if (selectedId !== id) return;
+      const incoming = result.data.filter(place =>
+        place.id !== selectedGame.placeId && place.id !== (selectedGame.rootPlaceId ?? selectedGame.placeId));
+      discoveredPlaces = loadMore ?
+        [...discoveredPlaces, ...incoming.filter(place => !discoveredPlaces.some(old => old.id === place.id))] :
+        incoming;
+      discoveryCursor = result.nextPageCursor;
+      discoveryAttempted = true;
+    } catch (error) {
+      if (selectedId === id) {
+        notice("Subplaces could not be discovered publicly. You can still add them manually. " + String(error), "bad");
+      }
+    } finally {
+      discoveryBusy = false;
+    }
+  }
+
+  function saveDiscoveredPlace(place: DiscoveredPlace) {
+    if (!selected || place.id === selected.placeId ||
+        selected.subplaces.some(item => item.placeId === place.id)) return;
+    if (selected.subplaces.length >= 100) return notice("Subplace limit reached.", "bad");
+    const id = selected.placeId;
+    games = games.map(game => game.placeId === id ? {
+      ...game, subplaces: [...game.subplaces, {
+        placeId: place.id, name: place.name.slice(0, 100) || "Unnamed place"
+      }]
+    } : game);
     persist();
-    selectGame(id);
-    newName = "";
-    newPlaceId = "";
-    notice("Saved to your library.");
+    notice("Subplace added to your library.");
+  }
+
+  function clearDiscovery() {
+    discoveredPlaces = [];
+    discoveryCursor = null;
+    discoveryAttempted = false;
   }
 
   function selectGame(id: number) {
     selectedId = id;
+    clearDiscovery();
     activePlaceId = id;
     servers = [];
     cursor = null;
@@ -207,8 +315,8 @@
             <h1>Stay thirsty<br /><em>for more.</em></h1>
             <p>One clean place for your favorite Roblox experiences, their subplaces, and public servers.</p>
             <div class="hero-actions">
-              <button class="btn primary" onclick={() => selected ? play(selected.placeId) : tab = "library"}>{selected ? "▶ Launch " + selected.name : "+ Add your first game"}</button>
-              <button class="btn secondary" onclick={() => tab = "library"}>Open library →</button>
+              <button class="btn primary" onclick={() => tab = "library"}>{games.length ? "▦ Open your library" : "+ Add your first game"}</button>
+              <button class="btn secondary" onclick={() => tab = "servers"}>Browse servers →</button>
             </div>
           </div>
           <div class="hero-art" aria-hidden="true"><div class="orb orb-outer"><div class="orb orb-inner">T</div></div></div>
@@ -218,6 +326,22 @@
           <div class="stat"><small>BOOKMARKED SUBPLACES</small><strong>{games.reduce((n, g) => n + g.subplaces.length, 0).toString().padStart(2, "0")}</strong><span>Quick launch shortcuts</span></div>
           <div class="stat"><small>BACKGROUND REFRESH</small><strong>OFF</strong><span>Servers load only on request</span></div>
         </div>
+        {#if games.length}
+          <div class="section-heading"><div><span class="eyebrow">ONE-CLICK LAUNCH</span><h2>Your favorites</h2></div><button class="link-button" onclick={() => tab = "library"}>Manage library ↗</button></div>
+          <div class="quick-launch-grid">
+            {#each games.slice(0, 12) as game (game.placeId)}
+              <div class="quick-game">
+                <button class="quick-game-main" onclick={() => play(game.placeId)} title={"Launch " + game.name} aria-label={"Launch " + game.name}>
+                  <span class="game-tile quick-game-icon">{game.name.slice(0, 1).toUpperCase()}
+                    {#if isTrustedIconUrl(game.iconUrl)}<img src={game.iconUrl} alt="" loading="lazy" decoding="async" onerror={event => event.currentTarget.style.display = "none"} />{/if}
+                  </span>
+                  <span class="quick-game-title">{game.name}</span>
+                </button>
+                <button class="quick-game-server" title={"Browse " + game.name + " servers"} aria-label={"Browse " + game.name + " servers"} onclick={() => { selectGame(game.placeId); tab = "servers"; }}>◎</button>
+              </div>
+            {/each}
+          </div>
+        {/if}
         <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>Your workspace</h2></div></div>
         <div class="feature-grid">
           <button class="feature" onclick={() => tab = "library"}><div class="feature-symbol">▦</div><h3>Game library</h3><p>Save experiences and individual subplaces. No account required.</p><span class="feature-link">Explore library ↗</span></button>
@@ -233,7 +357,9 @@
             <div class="games-list">
               {#each filteredGames as game (game.placeId)}
                 <button class:selected={selectedId === game.placeId} class="game-row" onclick={() => selectGame(game.placeId)}>
-                  <span class="game-tile">{game.name.slice(0, 1).toUpperCase()}</span>
+                  <span class="game-tile">{game.name.slice(0, 1).toUpperCase()}
+                    {#if isTrustedIconUrl(game.iconUrl)}<img src={game.iconUrl} alt="" loading="lazy" decoding="async" onerror={event => event.currentTarget.style.display = "none"} />{/if}
+                  </span>
                   <span class="game-row-name"><strong>{game.name}</strong><small>{game.subplaces.length} subplaces</small></span>
                   <span class="game-chevron">›</span>
                 </button>
@@ -243,22 +369,26 @@
             </div>
             <form class="add-form" onsubmit={event => { event.preventDefault(); addGame(); }}>
               <div class="form-title">+ SAVE A GAME</div>
-              <label for="game-name">Experience name</label>
-              <input id="game-name" class="input" maxlength="100" placeholder="e.g. Blue Lock Rivals" bind:value={newName} />
+              <label for="game-name">Custom display name (optional)</label>
+              <input id="game-name" class="input" maxlength="100" placeholder="Otherwise use the official Roblox name" bind:value={newName} />
               <label for="game-place">Roblox place ID or game URL</label>
               <input id="game-place" class="input" placeholder="e.g. 123456789" bind:value={newPlaceId} />
-              <button class="btn primary full" type="submit">Add to library</button>
+              <button class="btn primary full" type="submit" disabled={addingGame}>{addingGame ? "Looking up Roblox…" : "Add to library"}</button>
+              <p class="form-hint">Thirst fetches the official name and icon only when you add a game. If Roblox is unavailable, you can still save it with a custom name.</p>
             </form>
           </div>
           <div class="panel detail-panel">
             {#if selected}
               <div class="game-detail-head">
-                <span class="game-tile large">{selected.name.slice(0, 1).toUpperCase()}</span>
+                <span class="game-tile large">{selected.name.slice(0, 1).toUpperCase()}
+                  {#if isTrustedIconUrl(selected.iconUrl)}<img src={selected.iconUrl} alt="" loading="lazy" decoding="async" onerror={event => event.currentTarget.style.display = "none"} />{/if}
+                </span>
                 <div class="detail-title"><span class="eyebrow">SAVED EXPERIENCE</span><h2>{selected.name}</h2><p>Place ID {selected.placeId}</p></div>
               </div>
               <div class="detail-actions">
                 <button class="btn primary" onclick={() => play(selected.placeId)}>▶ Play experience</button>
                 <button class="btn secondary" onclick={() => goToServers(selected.placeId)}>◎ Servers</button>
+                <button class="btn secondary" disabled={syncingGame} onclick={syncSelectedGame}>{syncingGame ? "Syncing…" : "↻ Update icon"}</button>
                 <button class="btn danger subtle" onclick={removeGame} aria-label="Remove saved experience">Remove</button>
               </div>
               <div class="sub-header"><h3>Saved subplaces</h3><span>{selected.subplaces.length} PLACES</span></div>
@@ -279,6 +409,32 @@
                 </div>
                 <button class="btn secondary" type="submit">Save subplace +</button>
               </form>
+              <section class="discovery-box">
+                <div class="discovery-heading"><div><h3>Explore subplaces</h3><p>Retrieve places Roblox publicly lists for this experience. No login required.</p></div>
+                  <button class="btn secondary small" onclick={() => discoverPlaces(false)} disabled={discoveryBusy}>{discoveryBusy ? "Searching…" : "Discover places"}</button>
+                </div>
+                {#if discoveryAttempted}
+                  <div class="discover-results">
+                    {#each discoveredPlaces as place (place.id)}
+                      <div class="discovered-place"><div><strong>{place.name}</strong><small>ID {place.id}</small></div>
+                        <div class="row-actions">
+                          {#if selected.subplaces.some(item => item.placeId === place.id)}
+                            <span class="saved-label">SAVED</span>
+                          {:else}
+                            <button class="save-place" title={"Save " + place.name} aria-label={"Save " + place.name} onclick={() => saveDiscoveredPlace(place)}>+ Save</button>
+                          {/if}
+                          <button title={"Open server browser for " + place.name} onclick={() => goToServers(place.id)}>◎</button>
+                        </div>
+                      </div>
+                    {:else}
+                      <p class="form-hint">No additional public subplaces were returned on this page. Private or inaccessible places won't appear.</p>
+                    {/each}
+                    {#if discoveryCursor}
+                      <button class="btn secondary small" disabled={discoveryBusy} onclick={() => discoverPlaces(true)}>{discoveryBusy ? "Loading…" : "Load more places ↓"}</button>
+                    {/if}
+                  </div>
+                {/if}
+              </section>
             {:else}
               <div class="empty-state big"><div class="empty-mark">◇</div><h3>Build your collection</h3><p>Add an experience on the left to start saving places and exploring servers.</p></div>
             {/if}
