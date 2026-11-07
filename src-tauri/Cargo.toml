@@ -1,0 +1,23 @@
+[package]
+name = "thirst"
+version = "0.1.0"
+description = "A lightweight, local-first Roblox launcher"
+authors = ["N29dev"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.90"
+links = "thirst"
+
+[lib]
+name = "thirst_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+uuid = "1"
