@@ -35,7 +35,14 @@
   $: filteredGames = games.filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
     String(game.placeId).includes(filter));
   $: availablePlaces = selected
-    ? [{ placeId: selected.placeId, name: "Main place" }, ...selected.subplaces]
+    ? [
+        { placeId: selected.placeId, name: "Main place" },
+        ...selected.subplaces,
+        ...(activePlaceId && activePlaceId !== selected.placeId &&
+          !selected.subplaces.some(place => place.placeId === activePlaceId)
+          ? [{ placeId: activePlaceId, name: discoveredPlaces.find(place => place.id === activePlaceId)?.name || "Preview place" }]
+          : [])
+      ]
     : [];
 
   onMount(() => {
@@ -49,6 +56,12 @@
       if (toastTimeout) clearTimeout(toastTimeout);
     };
   });
+
+  function hideBrokenIcon(event: Event) {
+    if (event.currentTarget instanceof HTMLImageElement) {
+      event.currentTarget.style.display = "none";
+    }
+  }
 
   function dismissToast() {
     if (toastTimeout) clearTimeout(toastTimeout);
@@ -333,7 +346,7 @@
               <div class="quick-game">
                 <button class="quick-game-main" onclick={() => play(game.placeId)} title={"Launch " + game.name} aria-label={"Launch " + game.name}>
                   <span class="game-tile quick-game-icon">{game.name.slice(0, 1).toUpperCase()}
-                    {#if isTrustedIconUrl(game.iconUrl)}<img src={game.iconUrl} alt="" loading="lazy" decoding="async" onerror={event => event.currentTarget.style.display = "none"} />{/if}
+                    {#if isTrustedIconUrl(game.iconUrl)}<img src={game.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
                   </span>
                   <span class="quick-game-title">{game.name}</span>
                 </button>
@@ -358,7 +371,7 @@
               {#each filteredGames as game (game.placeId)}
                 <button class:selected={selectedId === game.placeId} class="game-row" onclick={() => selectGame(game.placeId)}>
                   <span class="game-tile">{game.name.slice(0, 1).toUpperCase()}
-                    {#if isTrustedIconUrl(game.iconUrl)}<img src={game.iconUrl} alt="" loading="lazy" decoding="async" onerror={event => event.currentTarget.style.display = "none"} />{/if}
+                    {#if isTrustedIconUrl(game.iconUrl)}<img src={game.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
                   </span>
                   <span class="game-row-name"><strong>{game.name}</strong><small>{game.subplaces.length} subplaces</small></span>
                   <span class="game-chevron">›</span>
@@ -381,7 +394,7 @@
             {#if selected}
               <div class="game-detail-head">
                 <span class="game-tile large">{selected.name.slice(0, 1).toUpperCase()}
-                  {#if isTrustedIconUrl(selected.iconUrl)}<img src={selected.iconUrl} alt="" loading="lazy" decoding="async" onerror={event => event.currentTarget.style.display = "none"} />{/if}
+                  {#if isTrustedIconUrl(selected.iconUrl)}<img src={selected.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
                 </span>
                 <div class="detail-title"><span class="eyebrow">SAVED EXPERIENCE</span><h2>{selected.name}</h2><p>Place ID {selected.placeId}</p></div>
               </div>
