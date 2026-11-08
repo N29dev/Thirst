@@ -15,7 +15,7 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 - Fetch public Roblox servers on demand with player counts, Roblox-reported ping and FPS, pagination, and instance-specific launch links.
 - Launch Roblox using its registered desktop deep-link protocol on macOS or Windows.
 - Keep bookmarks and preferences locally. No Thirst account, telemetry, or background polling.
-- Optional **AppleBlox-style** native Roblox session login: 15-second non-bypassable Rust consent gate, separate incognito Roblox webview, local macOS Keychain / Windows Credential Manager credential storage, no cookie in Svelte, verification with Roblox.
+- Optional **AppleBlox-style** Roblox session login: a 15-second Rust consent gate; on macOS, a separate **Swift/WKWebView helper** with non-persistent storage, automatic native cookie detection and a temporary Keychain entry; on Windows, an isolated Tauri webview. Native code verifies the cookie with Roblox before storing the primary credential. No cookie is returned to Svelte.
 
 ## Run locally
 
@@ -37,7 +37,7 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Native bundling is currently disabled in `src-tauri/tauri.conf.json`. Signed macOS / Windows installers will be part of a later milestone.
+Native bundling is currently disabled in `src-tauri/tauri.conf.json`. The macOS Swift helper is compiled by `swiftc` during a **developer build** and is loaded from Cargo's output directory; packaged apps still need signed sidecar distribution. Xcode Command Line Tools are required on macOS. Signed macOS / Windows installers will be part of a later milestone.
 
 ## Roadmap
 
@@ -66,7 +66,9 @@ Roblox's public experience and subplace endpoints can fail, be restricted, or re
 src/                   Svelte UI + local-only library
 src/lib/backend.ts     Typed native calls
 src-tauri/src/lib.rs   Rust-side validation, launch, public server API
-src-tauri/src/auth.rs  Native Roblox session sign-in and OS secure storage
+src-tauri/src/auth.rs  Native Roblox session verification and Keychain storage
+src-tauri/native/macos/ThirstLogin.swift  Independent native macOS login helper
+src-tauri/build.rs  Compiles Swift helper for macOS developer builds
 src-tauri/capabilities Minimal Tauri permissions
 docs/SECURITY.md       Security policy and login requirements
 ```
@@ -74,3 +76,7 @@ docs/SECURITY.md       Security policy and login requirements
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## AppleBlox source and licensing
+
+Thirst's macOS login behavior was informed by AppleBlox's public architecture and documentation. The Swift helper in this repo is an independent implementation; no AppleBlox GPL-3.0-only source code was copied. AppleBlox is GPL-3.0-only and is not affiliated with Thirst.
