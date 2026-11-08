@@ -1,42 +1,50 @@
-# Thirst security model (alpha)
+# Thirst security — experimental session authentication
 
-The current developer preview only uses Roblox deep links, **unauthenticated public server listings, game metadata, game icons and subplace discovery**.
+> **Important:** Thirst's new Roblox connection is an **experimental full-session authentication feature**. It has not been independently security-audited or validated against all Roblox account/login flows. Test with a separate, low-value account. Never upload your `.ROBLOSECURITY` cookie to GitHub, Discord, issue trackers, logs, or screenshots.
 
-## Current boundaries
+## Exact session risk
 
-- JavaScript cannot run shell commands or access Roblox cookies; Rust exposes only three narrowly defined commands.
-- The native launch command accepts a numeric place ID and optional UUID server ID. It builds a fixed `roblox://experiences/start` deep link; it never interpolates arguments into shell commands.
-- Public server calls use `https://games.roblox.com`; on-demand game details and universe discovery use `https://apis.roblox.com`, `https://games.roblox.com` and `https://thumbnails.roblox.com`; subplace discovery uses `https://develop.roblox.com`. All request hostnames are fixed in native Rust, with HTTPS, redirects disabled and a nine-second timeout.\n- Icon URLs returned to the webview are checked against the Roblox CDN host suffix (`rbxcdn.com`); image loading is restricted by CSP.
-- Bookmarks and Lite Mode use localStorage, **exclusively for non-sensitive data**.
-- No Thirst server, analytics, plugin injection, background polling, or hidden browser automation is included.
-- CSP prevents remote frames or scripts; Tauri window permissions are minimal.
+After the user's explicit consent, Thirst retrieves the `.ROBLOSECURITY` cookie from **its own isolated official Roblox sign-in webview**. This is a bearer credential that can provide broad account access, potentially bypassing 2-step verification if stolen. A 15-second warning and checkbox enforce informed consent; **they do not themselves protect the cookie**.
 
-## AppleBlox-style login: planned but not implemented
+Roblox warns users not to disclose their cookies and may change cookie formats/rotation. A third-party launcher cannot promise zero risk.
 
-A browser session cookie is powerful enough to compromise an account if stolen. We will not ship cookie capture until we can satisfy these requirements:
+## Implemented security boundaries
 
-1. Open only Roblox-owned HTTPS login pages within an appropriately isolated login flow. Do not ask the user to paste cookies, passwords, or 2FA codes into our UI.
-2. Check effective origin and redirects, prevent cross-origin cookie exposure, and explicitly isolate the authentication browser profile.
-3. Handle all session tokens in native code. The Svelte webview and plugins must never receive raw cookie bytes or a generic authenticated network proxy.
-4. Store credentials in macOS Keychain or Windows Credential Manager with OS access controls, not localStorage, SQLite, text files or logs.
-5. Restrict cookie-bearing requests to an audited allowlist of Roblox endpoints; disable cross-host redirects and use safe HTTP timeouts.
-6. Redact all sensitive headers, tickets and cookies from logs, crash reports, errors and diagnostics.
-7. Provide local removal and explain that revoking the Roblox session itself may need separate action on Roblox.
-8. Never transmit cookies to Thirst servers, RoValra, Cloudflare, Discord, analytics, or extensions.
-9. Audit macOS and Windows implementations separately and run a public security review before beta.
-10. Follow Roblox's applicable API terms; cookie authentication does not bypass API limits.
+1. Consent starts only when the user clicks Connect. An independent Rust `Instant` timer rejects requests to open the login window before **15 seconds**. The UI also requires an acknowledgement checkbox.
+2. The browser opens the fixed `https://www.roblox.com/login` page with an **incognito webview**. Navigation to non-HTTPS or non-`roblox.com` hosts is blocked at the main-frame level. JavaScript popup windows are denied; developer tools are disabled.
+3. The login webview is **not included in Tauri's main-window capability**. Roblox websites cannot invoke the launcher commands. The application never asks users to paste credentials or cookies into Svelte.
+4. The **native Rust** `finish_roblox_login` handler retrieves the HttpOnly cookie from the isolated webview. It does not log or return the cookie through IPC.
+5. Native verification uses **only** `https://users.roblox.com/v1/users/authenticated`, with HTTPS, a fixed host, disabled redirects, and a timeout. A rotated cookie from that fixed response may update the saved secret.
+6. The credential is stored using macOS Keychain / Windows Credential Manager through the `keyring` library. There are no cookie fields in JavaScript, localStorage, SQLite, or config files.
+7. Signed-in account information returned to Svelte is limited to Roblox ID, username and display name.
+8. Disconnect removes the locally stored credential. Closing or cancelling the incognito login webview discards its browser session; removing the local credential **does not revoke Roblox's server-side session**. Use Roblox Settings → Security to revoke sessions.
+9. The app has no remote Thirst backend, third-party telemetry or plugin API. Session-bearing requests do not go to RoValra, Cloudflare, Discord, thumbnails providers or the public server browser.
+10. Sensitive request headers/cookies and errors are never logged in the new auth module.
+
+## Known limitations and outstanding work
+
+- **Not independently audited.** Browser isolation, macOS and Windows keychain access and cookie rotation still require user-level testing and a security review.
+- Login redirects, CAPTCHA providers, popups, changing Roblox login behavior and platform WebView updates can prevent some logins; do not relax the origin allowlist without a reviewed justification.
+- Local malicious software or a compromised application/update process may still steal session credentials. Keychain encryption is not a guarantee against compromise.
+- Roblox's cookie-based legacy APIs may be incompatible or restricted; this feature is not a rate-limit bypass and does not automatically grant access to unsupported endpoints.
+- Production builds require code signing, distribution/update integrity, a secure release pipeline, and external security review.
+- Do not use a valuable account during these alpha tests.
+
+## Other application boundaries
+
+- Native launch builds `roblox://experiences/start` from validated numeric place IDs and optional UUID server IDs; user input cannot become arbitrary shell commands.
+- On-demand Roblox public requests use fixed HTTPS hosts with redirects disabled.
+- Game icon URLs are accepted only from Roblox's CDN suffix `rbxcdn.com` and constrained by Content Security Policy.
+- Saved games and Lite Mode use localStorage exclusively for nonsensitive metadata.
+
+## How to test safely
+
+1. Install the app from code you reviewed and keep the machine free of untrusted software.
+2. Use a **dedicated test Roblox account**. Confirm the modal starts at 15 seconds and the button remains disabled until both the countdown and explicit checkbox are satisfied.
+3. Confirm the sign-in page really is the official Roblox website, finish login there, then click Finish connection in Thirst.
+4. Confirm only the username, display name and ID appear in the application; no token or cookie appears in the UI, browser DevTools output, logs, localStorage or crash information.
+5. Test local disconnect. Afterwards, manually revoke the session from the Roblox account's security settings.
 
 ## Security reports
 
-Do not include live credentials or exploitable details in public GitHub issues. Contact the maintainer privately until private vulnerability reporting is enabled.
-
-## Current state
-
-| Area | State |
-| --- | --- |
-| Local bookmarks | Available |
-| Public server calls | Available |\n| On-demand public metadata, icons and subplaces | Available, subject to Roblox's API limits |
-| Validated native Roblox deep links | Available |
-| Cookie access or session extraction | Not implemented |
-| macOS Keychain and Windows Credential Manager integration | Not implemented |
-| Account-specific features | Not implemented |
+Never share real cookies or secrets in public issues. Contact the maintainer privately until GitHub private vulnerability reporting is available.
