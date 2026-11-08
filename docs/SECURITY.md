@@ -37,7 +37,7 @@ Roblox warns users not to disclose their cookies and may change cookie formats/r
 - On-demand Roblox public requests use fixed HTTPS hosts with redirects disabled.
 - Server avatars are loaded automatically for up to eight loaded servers when a connected Roblox account has been verified and the feature is enabled (default), or on demand for guests. Auto-loading can be disabled and is off in Lite Mode. The public `playerTokens` array is excluded from Tauri IPC serialization and held for at most five minutes in bounded native RAM. Only up to five validated Roblox CDN image URLs per server are returned to Svelte. A native Rust unit test checks that tokens cannot be serialized over IPC. The single bounded batch uses only the fixed `https://thumbnails.roblox.com/v1/batch` host. It sends **no Roblox session cookie by default**; the separate explicit native-only session switch permits it. Roblox's own documentation does not require cookies for this thumbnail endpoint, so an authenticated request may not improve unavailable images. The app does not look up or infer players' identities.
 - Game icon URLs are accepted only from Roblox's CDN suffix `rbxcdn.com` and constrained by Content Security Policy.
-- Saved games and Lite Mode use localStorage exclusively for nonsensitive metadata.
+- Saved games, Lite Mode and manual region reports use localStorage exclusively for nonsensitive metadata. Region reports contain only a public place ID, public server UUID, broad region code, fixed `local-report` source and time. Invalid/expired reports are discarded on read and expire after two hours. Nothing is uploaded, and no client IP geolocation is performed.
 
 ## How to test safely
 
