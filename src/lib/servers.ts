@@ -1,4 +1,5 @@
 import type { PublicServer } from "./types";
+import type { LocalRegionReport, RegionFilter } from "./regions";
 
 export type ServerSort = "default" | "lowest-ping" | "most-players" | "fewest-players" | "most-slots";
 export type ServerFilters = {
@@ -6,6 +7,7 @@ export type ServerFilters = {
   hideFull: boolean;
   maxPing: number | null;
   search: string;
+  region: RegionFilter;
 };
 
 export const SERVER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -18,7 +20,9 @@ export function isValidServerId(value: unknown): value is string {
 // favorite server UUIDs; bookmarks are better attached to games/subplaces.
 export function filterAndSortServers(
   servers: PublicServer[],
-  filters: ServerFilters
+  filters: ServerFilters,
+  regionReports: LocalRegionReport[] = [],
+  placeId: number | null = null
 ): PublicServer[] {
   const query = filters.search.trim().toLowerCase();
   const matches = servers.filter(server => {
@@ -26,6 +30,14 @@ export function filterAndSortServers(
     if (filters.maxPing !== null && (server.ping === null || !Number.isFinite(server.ping) ||
       server.ping > filters.maxPing)) return false;
     if (query && !server.id.toLowerCase().includes(query)) return false;
+    if (filters.region !== "any") {
+      const region = placeId === null ? null : regionReports.find(entry =>
+        entry.placeId === placeId && entry.serverId === server.id.toLowerCase() &&
+        Date.now() >= entry.observedAt && Date.now() - entry.observedAt < 2 * 60 * 60 * 1000
+      );
+      if (filters.region === "unknown" && region) return false;
+      if (filters.region !== "unknown" && (!region || region.region !== filters.region)) return false;
+    }
     return true;
   });
   if (filters.sort === "default") return matches;
