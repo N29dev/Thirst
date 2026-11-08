@@ -331,6 +331,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn server_preview_tokens_never_cross_frontend_serialization() {
+        let server = PublicServer {
+            id: "550e8400-e29b-41d4-a716-446655440000".into(),
+            playing: 4,
+            max_players: 10,
+            ping: None,
+            player_tokens: Some(vec!["SENSITIVE_PUBLIC_TOKEN".into()]),
+        };
+        let json = serde_json::to_string(&server).expect("serialize");
+        assert!(!json.contains("playerTokens"));
+        assert!(!json.contains("SENSITIVE_PUBLIC_TOKEN"));
+        assert!(json.contains("maxPlayers"));
+        let from_null: PublicServer = serde_json::from_str(
+            r#"{"id":"550e8400-e29b-41d4-a716-446655440000","playing":1,"maxPlayers":10,"playerTokens":null}"#
+        ).expect("nullable tokens");
+        assert!(from_null.player_tokens.is_none());
+    }
+
+    #[test]
     fn rejects_invalid_places() {
         assert!(make_launch_url(0, None).is_err());
         assert!(make_launch_url(u64::MAX, None).is_err());
