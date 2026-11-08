@@ -2,11 +2,11 @@
   import { onMount } from "svelte";
   import {
     beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
-    disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview,
+    disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview, fetchServerAvatarPreviews,
     finishRobloxLogin, launchPlace, lookupGame, openRobloxLogin, platformName, pollRobloxLoginStatus
   } from "./lib/backend";
   import type { ConnectedAccount } from "./lib/backend";
-  import { isTrustedIconUrl, parsePlaceId, readLibrary, readLiteMode, writeLibrary, writeLiteMode } from "./lib/library";
+  import { isTrustedIconUrl, parsePlaceId, readAutoAvatarPreviews, readLibrary, readLiteMode, writeAutoAvatarPreviews, writeLibrary, writeLiteMode } from "./lib/library";
   import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
   import { filterAndSortServers, isValidServerId } from "./lib/servers";
   import type { ServerSort } from "./lib/servers";
@@ -41,6 +41,11 @@
   let serverMaxPing = "any";
   let serverSearch = "";
   let serverLoadError = "";
+  let autoAvatarEnabled = true;
+  let bulkPreviewBusy = false;
+  let bulkPreviewRequested: string[] = [];
+  let bulkPreviewError = "";
+  let bulkPreviewVersion = 0;
   let nextServerRequestAt = 0;
   let expandedPreviewId: string | null = null;
   let previewLoadingId: string | null = null;
@@ -109,6 +114,7 @@
     selectedId = games[0]?.placeId ?? null;
     activePlaceId = selectedId;
     liteMode = readLiteMode();
+    autoAvatarEnabled = readAutoAvatarPreviews();
     platformName().then(value => platform = value).catch(() => platform = "Desktop");
     // Prevent a pending notification callback from outliving the desktop window.
     return () => {
@@ -125,6 +131,7 @@
     accountError = "";
     try {
       connectedAccount = await connectedRobloxAccount();
+      if (connectedAccount && tab === "servers") void loadAutomaticAvatars();
     } catch (error) {
       connectedAccount = null;
       accountError = String(error);
@@ -211,6 +218,7 @@
     loginBusy = true;
     try {
       connectedAccount = await finishRobloxLogin();
+      if (tab === "servers") void loadAutomaticAvatars();
       accountStatusLoaded = true;
       accountError = "";
       loginStep = null;
@@ -240,6 +248,8 @@
     try {
       await disconnectRobloxAccount();
       connectedAccount = null;
+      bulkPreviewVersion++;
+      avatarPreviews = {};
       accountStatusLoaded = true;
       accountError = "";
       notice("Thirst's saved Roblox session was deleted locally.");
@@ -439,6 +449,9 @@
     previewLoadingId = null;
     avatarPreviews = {};
     avatarErrors = {};
+    bulkPreviewVersion++;
+    bulkPreviewRequested = [];
+    bulkPreviewError = "";
   }
 
   function removeGame() {
@@ -485,6 +498,9 @@
     previewLoadingId = null;
     avatarPreviews = {};
     avatarErrors = {};
+    bulkPreviewVersion++;
+    bulkPreviewRequested = [];
+    bulkPreviewError = "";
   }
 
   async function play(placeId: number, jobId: string | null = null) {
@@ -521,6 +537,8 @@
         previewLoadingId = null;
         avatarPreviews = {};
         avatarErrors = {};
+        bulkPreviewVersion++;
+        bulkPreviewRequested = [];
       }
       servers = loadMore ?
         [...servers, ...result.data.filter(server => !servers.some(old => old.id === server.id))] :
@@ -528,6 +546,7 @@
       cursor = loadMore ? nextCursor : null;
       nextCursor = result.nextPageCursor;
       fetchedAt = new Date();
+      if (!loadMore && connectedAccount) void loadAutomaticAvatars();
       if (!servers.length) notice("No public servers returned for this place.");
     } catch (error) {
       if (activePlaceId === requestedPlace) {
@@ -540,6 +559,43 @@
     } finally {
       loading = false;
     }
+  }
+
+  async function loadAutomaticAvatars() {
+    if (!connectedAccount || !autoAvatarEnabled || liteMode || !activePlaceId || bulkPreviewBusy) return;
+    // One batch: max 8 servers, 5 anonymous avatars each, per manual refresh.
+    // Public thumbnails do not use cookies or identify players.
+    const placeId = activePlaceId;
+    const ids = servers.slice(0, 8).map(server => server.id).filter(isValidServerId)
+      .filter(id => !Object.prototype.hasOwnProperty.call(avatarPreviews, id));
+    if (!ids.length) return;
+    const version = ++bulkPreviewVersion;
+    bulkPreviewBusy = true;
+    bulkPreviewRequested = ids;
+    bulkPreviewError = "";
+    try {
+      const result = await fetchServerAvatarPreviews(placeId, ids);
+      if (activePlaceId !== placeId || version !== bulkPreviewVersion) return;
+      const cleaned: Record<string, string[]> = {};
+      for (const id of ids) {
+        cleaned[id] = (result[id] ?? []).filter(isTrustedIconUrl).slice(0, 5);
+      }
+      avatarPreviews = { ...avatarPreviews, ...cleaned };
+    } catch (error) {
+      if (activePlaceId === placeId && version === bulkPreviewVersion) {
+        bulkPreviewError = String(error);
+      }
+    } finally {
+      bulkPreviewBusy = false;
+      bulkPreviewRequested = [];
+    }
+  }
+
+  function setAutoAvatarEnabled(enabled: boolean) {
+    autoAvatarEnabled = enabled;
+    try { writeAutoAvatarPreviews(enabled); }
+    catch { notice("Could not save avatar preferences.", "bad"); }
+    if (enabled && tab === "servers") void loadAutomaticAvatars();
   }
 
   async function toggleServerPreview(serverId: string) {
@@ -571,9 +627,16 @@
     try { writeLiteMode(enabled); } catch { notice("Couldn't save preference.", "bad"); }
   }
 
+  function enterServerBrowser() {
+    tab = "servers";
+    // Verify once on visiting Servers. Don't read Keychain just to download
+    // public thumbnails, and don't prompt on every application startup.
+    if (!accountStatusLoaded && !checkingAccount) void loadConnectedAccount();
+  }
+
   function goToServers(id?: number) {
     if (id) changeActivePlace(id);
-    tab = "servers";
+    enterServerBrowser();
   }
 </script>
 
@@ -592,7 +655,7 @@
     <nav aria-label="Main navigation">
       <button class:active={tab === "home"} onclick={() => tab = "home"}><span class="nav-icon">⌂</span> Overview</button>
       <button class:active={tab === "library"} onclick={() => tab = "library"}><span class="nav-icon">▦</span> My library <span class="nav-count">{games.length}</span></button>
-      <button class:active={tab === "servers"} onclick={() => tab = "servers"}><span class="nav-icon">◎</span> Server browser</button>
+      <button class:active={tab === "servers"} onclick={enterServerBrowser}><span class="nav-icon">◎</span> Server browser</button>
     </nav>
     <span class="section-label section-spaced">PREFERENCES</span>
     <nav aria-label="Preferences">
@@ -619,7 +682,7 @@
             <p>One clean place for your favorite Roblox experiences, their subplaces, and public servers.</p>
             <div class="hero-actions">
               <button class="btn primary" onclick={() => tab = "library"}>{games.length ? "▦ Open your library" : "+ Add your first game"}</button>
-              <button class="btn secondary" onclick={() => tab = "servers"}>Browse servers →</button>
+              <button class="btn secondary" onclick={enterServerBrowser}>Browse servers →</button>
             </div>
           </div>
           <div class="hero-art" aria-hidden="true"><div class="orb orb-outer"><div class="orb orb-inner">T</div></div></div>
@@ -652,7 +715,7 @@
         <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>Your workspace</h2></div></div>
         <div class="feature-grid">
           <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "library"}><div class="feature-symbol">▦</div><h3>Game library</h3><p>Save experiences and individual subplaces. No account required.</p><span class="feature-link">Explore library ↗</span></button>
-          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "servers"}><div class="feature-symbol">◎</div><h3>Public servers</h3><p>Browse server population, FPS and Roblox-reported latency.</p><span class="feature-link">Browse servers ↗</span></button>
+          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={enterServerBrowser}><div class="feature-symbol">◎</div><h3>Public servers</h3><p>Browse server population, FPS and Roblox-reported latency.</p><span class="feature-link">Browse servers ↗</span></button>
           <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "settings"}><div class="feature-symbol">⚙</div><h3>Personalize</h3><p>Switch to Lite Mode and keep resource usage predictable.</p><span class="feature-link">Your settings ↗</span></button>
         </div>
       {:else if tab === "library"}
@@ -767,7 +830,7 @@
             </select>
             <button class="btn primary" disabled={!activePlaceId || loading} onclick={() => loadServers(false)}>{loading ? "Loading…" : "↻ Refresh"}</button>
           </div>
-          <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Regions are unknown until independently verified.</div>
+          <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Regions are unknown until independently verified. Connected users see automatic anonymous avatar previews for up to eight loaded servers (unless disabled or in Lite Mode).</div>
           <div class="server-filter-bar">
             <label for="server-sort">Sort
               <select id="server-sort" class="input" bind:value={serverSort}>
@@ -798,6 +861,7 @@
             <span>{visibleServers.length} shown / {servers.length} loaded · Region: <strong>Unknown</strong></span>
             <button class="link-button" onclick={() => { serverSort = "default"; serverMaxPing = "any"; serverHideFull = false; serverSearch = ""; }}>Clear filters</button>
             {#if serverLoadError}<span class="server-error">Last request failed: {serverLoadError}</span>{/if}
+            {#if bulkPreviewError}<span class="preview-error" title={bulkPreviewError}>Automatic avatars unavailable; manual preview remains available.</span>{/if}
           </div>
           <div class="table-head"><span>SERVER</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
           {#each visibleServers as server (server.id)}
@@ -810,11 +874,11 @@
                 <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join ↗</button>
               </div>
             </div>
-            {#if expandedPreviewId === server.id}
+            {#if expandedPreviewId === server.id || (autoAvatarEnabled && connectedAccount && !liteMode && ((avatarPreviews[server.id]?.length ?? 0) > 0 || (bulkPreviewBusy && bulkPreviewRequested.includes(server.id))))}
               <div class="server-avatar-panel">
                 <span class="preview-caption">Anonymous public avatar previews · no player names or IDs</span>
-                {#if previewLoadingId === server.id}
-                  <span class="preview-status">Requesting up to five thumbnails from Roblox…</span>
+                {#if previewLoadingId === server.id || (bulkPreviewBusy && bulkPreviewRequested.includes(server.id))}
+                  <span class="preview-status">Requesting up to five anonymous thumbnails from Roblox…</span>
                 {:else if avatarErrors[server.id]}
                   <span class="preview-status preview-error">{avatarErrors[server.id]}</span>
                   <button class="btn small secondary" onclick={() => { avatarErrors = { ...avatarErrors, [server.id]: "" }; expandedPreviewId = null; void toggleServerPreview(server.id); }}>Retry</button>
@@ -844,7 +908,8 @@
       {:else}
         <div class="page-title"><div><span class="eyebrow">PREFERENCES & PRIVACY</span><h1>Settings</h1><p>Personalize Thirst without compromising performance.</p></div></div>
         <div class="settings-column">
-          <section class="panel settings-panel"><div><h3>Lite Mode</h3><p>Disable decorative gradients and transitions to reduce UI overhead.</p></div><label class="switch"><input type="checkbox" checked={liteMode} onchange={e => setLiteMode(e.currentTarget.checked)} /><span class="slider"></span></label></section>
+          <section class="panel settings-panel"><div><h3>Lite Mode</h3><p>Disable decorative gradients and transitions to reduce UI overhead.</p></div><label class="switch"><input type="checkbox" checked={liteMode} onchange={e => setLiteMode(e.currentTarget.checked)} /><span class="slider"></span></label></section> 
+          <section class="panel settings-panel"><div><h3>Automatic server avatars</h3><p>When a Roblox account is connected, load up to five anonymous public avatars for each of the first eight servers in one batch after Refresh. No Roblox cookies are sent with thumbnail requests. Disabled in Lite Mode.</p></div><label class="switch"><input type="checkbox" checked={autoAvatarEnabled} onchange={e => setAutoAvatarEnabled(e.currentTarget.checked)} /><span class="slider"></span></label></section>
           <section class="panel settings-panel account-settings">
             <div class="account-info">
               <h3>Roblox account</h3>
