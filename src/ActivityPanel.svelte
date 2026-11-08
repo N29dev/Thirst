@@ -43,9 +43,12 @@
     scanning = true;
     if (manual) { error = ""; message = ""; }
     try {
+      const since = trackingSince();
+      const observed = await recentPlayerSessions(since);
+      // Turning tracking off or clearing history invalidates an in-flight scan.
+      if (!tracking || trackingSince() !== since) return;
       const before = entries.length;
-      const observed = await recentPlayerSessions(trackingSince());
-      entries = mergeObservedSessions(entries, observed, games, trackingSince());
+      entries = mergeObservedSessions(entries, observed, games, since);
       if (manual) {
         message = observed.length
           ? "Read " + observed.length + " recent Player join events. " +
