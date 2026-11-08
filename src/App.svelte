@@ -1209,15 +1209,26 @@
                 <LibrarySpotlight game={selected}/>
               </div>
               {/key}
-              <div class="detail-actions">
-                <button class="btn primary" onclick={() => play(selected.placeId)}><UiIcon name="play" size={16}/> Play experience</button>
-                <button class="btn secondary" onclick={() => goToServers(selected.placeId)}><UiIcon name="server" size={16}/> Browse servers</button>
-                <button class="btn secondary" disabled={syncingGame} onclick={syncSelectedGame}>{syncingGame ? "Syncing…" : "↻ Update icon"}</button>
-                {#if games.length > 1}
-                  <button class="btn secondary" title="Move experience up in favorites" aria-label={"Move " + selected.name + " up"} disabled={games[0]?.placeId === selected.placeId} onclick={() => moveGame(-1)}>↑ Move</button>
-                  <button class="btn secondary" title="Move experience down in favorites" aria-label={"Move " + selected.name + " down"} disabled={games[games.length - 1]?.placeId === selected.placeId} onclick={() => moveGame(1)}>↓ Move</button>
-                {/if}
-                <button class="btn danger subtle" onclick={removeGame} aria-label="Remove saved experience">Remove</button>
+              <div class="library-action-bar">
+                <div class="library-action-main">
+                  <button class="btn primary" onclick={() => play(selected.placeId)}><UiIcon name="play" size={15}/> Play</button>
+                  <button class="btn secondary" onclick={() => goToServers(selected.placeId)}><UiIcon name="server" size={15}/> Servers</button>
+                </div>
+                <div class="library-action-utilities">
+                  <button class="btn secondary library-icon-action" disabled={syncingGame}
+                    title={syncingGame ? "Refreshing artwork…" : "Refresh official Roblox game artwork"}
+                    aria-label="Refresh game artwork" onclick={syncSelectedGame}>↻</button>
+                  {#if games.length > 1}
+                    <button class="btn secondary library-icon-action"
+                      title="Move experience up in favorites" aria-label={"Move " + selected.name + " up"}
+                      disabled={games[0]?.placeId === selected.placeId} onclick={() => moveGame(-1)}>↑</button>
+                    <button class="btn secondary library-icon-action"
+                      title="Move experience down in favorites" aria-label={"Move " + selected.name + " down"}
+                      disabled={games[games.length - 1]?.placeId === selected.placeId} onclick={() => moveGame(1)}>↓</button>
+                  {/if}
+                  <button class="btn danger subtle library-remove-action" onclick={removeGame}
+                    title="Remove this saved experience" aria-label="Remove saved experience">Remove</button>
+                </div>
               </div>
               <div class="sub-header"><h3>Saved subplaces</h3><span>{selected.subplaces.length} PLACES · ☆ PINS TO HOME</span></div>
               <div class="subplace-list">
