@@ -949,7 +949,7 @@
     </nav>
     <div class="sidebar-bottom">
       <div class="sidebar-note"><span class="note-indicator"></span><span>Local-first · No account needed</span></div>
-      <div class="version">THIRST ALPHA <span>0.3.0</span></div>
+      <div class="version">THIRST ALPHA <span>0.4.0</span></div>
     </div>
   </aside>
 
@@ -1326,7 +1326,7 @@
             <span class="settings-icon">♙</span>
           </section>
           <section class="panel settings-panel"><div><h3>Network behavior</h3><p>No background polling. On-demand requests use fixed Roblox API hosts in Rust; approved game icons load from Roblox CDN. No Thirst backend or analytics service.</p><span class="chip">LOCAL-FIRST</span></div><span class="settings-icon">◎</span></section>
-          <section class="panel settings-panel"><div><h3>Early development</h3><p>Thirst Alpha 0.3 (experimental authentication). Test with a separate, low-value Roblox account before using your main account.</p></div><span class="settings-icon">◈</span></section>
+          <section class="panel settings-panel"><div><h3>Early development</h3><p>Thirst Alpha 0.4 (Fast Flags, portable library and experimental authentication). Test with a separate, low-value Roblox account before using your main account.</p></div><span class="settings-icon">◈</span></section>
         </div>
       {/if}
       <footer class="app-footer"><span>THIRST / OPEN SOURCE PROJECT</span><span>BUILT TO STAY OUT OF YOUR GAME'S WAY.</span></footer>
