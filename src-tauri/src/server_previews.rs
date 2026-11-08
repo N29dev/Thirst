@@ -60,6 +60,7 @@ impl PreviewCache {
 struct Request {
     request_id: String,
     token: String,
+    target_id: u64,
     #[serde(rename = "type")]
     thumbnail_type: &'static str,
     size: &'static str,
@@ -102,6 +103,7 @@ pub async fn server_avatar_preview(
         .map(|token| Request {
             request_id: format!("0:{token}:AvatarHeadshot:150x150:png:regular"),
             token,
+            target_id: 0,
             thumbnail_type: "AvatarHeadShot",
             size: "150x150",
             format: "png",
@@ -159,7 +161,8 @@ pub async fn server_avatar_previews(
                 requests.push(Request {
                     request_id,
                     token,
-                            thumbnail_type: "AvatarHeadShot",
+                    target_id: 0,
+                    thumbnail_type: "AvatarHeadShot",
                     size: "150x150",
                     format: "png",
                     is_circular: false,
