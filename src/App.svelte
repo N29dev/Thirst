@@ -12,7 +12,7 @@
     finishRobloxLogin, launchPlace, lockRobloxSession, lookupGame, lookupRoValraRegions, openRobloxLogin, platformName, pollRobloxLoginStatus
   } from "./lib/backend";
   import type { ConnectedAccount, ThirstUpdateCheck } from "./lib/backend";
-  import { checkThirstUpdate, openThirstReleases } from "./lib/backend";
+  import { checkThirstUpdate, openThirstReleases, openThirstDevBuilds } from "./lib/backend";
   import { isTrustedIconUrl, parsePlaceId, readAutoAvatarPreviews, readLibrary, readLibrarySort, readLiteMode, readRoValraEnabled, writeAutoAvatarPreviews, writeLibrary, writeLibrarySort, writeLiteMode, writeRoValraEnabled } from "./lib/library";
   import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
   import { filterAndSortServers, isValidServerId } from "./lib/servers";
@@ -213,6 +213,14 @@
   async function openUpdatesPage() {
     try {
       await openThirstReleases();
+    } catch (reason) {
+      notice(String(reason), "bad");
+    }
+  }
+
+  async function openDevelopmentBuilds() {
+    try {
+      await openThirstDevBuilds();
     } catch (reason) {
       notice(String(reason), "bad");
     }
@@ -1438,6 +1446,9 @@
                 <button class="btn primary" onclick={openUpdatesPage}>
                   {releaseCheck?.updateAvailable ? "View update on GitHub ↗" : "GitHub releases ↗"}
                 </button>
+                {#if releaseCheck?.status === "no-releases"}
+                  <button class="btn secondary" onclick={openDevelopmentBuilds}>Developer builds ↗</button>
+                {/if}
               </div>
               <p class="update-disclaimer">For now, installation is manual. Automatic installation requires a signed Tauri update channel, which has not been configured yet. Thirst never installs an unsigned Actions artifact.</p>
             </div>
