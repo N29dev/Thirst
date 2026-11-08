@@ -167,6 +167,16 @@ pub async fn open_roblox_login(
     Ok(())
 }
 
+/// Retry an incomplete embedded login without relaxing navigation restrictions.
+/// Does not access, transmit, or disclose any session cookie.
+#[tauri::command]
+pub async fn reload_roblox_login(app: AppHandle) -> Result<(), String> {
+    let webview = app.get_webview_window("roblox-login")
+        .ok_or("The isolated sign-in window is closed. Cancel and reconnect to reopen it.")?;
+    webview.reload()
+        .map_err(|_| "Could not reload the official Roblox sign-in page.".to_owned())
+}
+
 #[tauri::command]
 pub async fn finish_roblox_login(app: AppHandle) -> Result<ConnectedAccount, String> {
     let webview = app.get_webview_window("roblox-login")
