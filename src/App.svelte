@@ -3,6 +3,7 @@
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import UiIcon from "./UiIcon.svelte";
+  import thirstAppIcon from "../src-tauri/icons/thirst.svg";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
   import { historyEnabled, readActivityHistory, recordLaunchAttempt } from "./lib/activity";
@@ -1050,7 +1051,7 @@
 <div class:lite={liteMode} class="app" data-page={tab}>
   <aside class="sidebar">
     <button class="brand" onclick={() => tab = "home"} aria-label="Thirst home">
-      <span class="logo"><span class="logo-letter">T</span></span>
+      <span class="logo"><img src={thirstAppIcon} alt="" draggable="false" /></span>
       <span class="brand-text"><strong>thirst<span class="brand-dot">.</span></strong><small>ROBLOX LAUNCHER</small></span>
     </button>
     <span class="section-label">WORKSPACE</span>
