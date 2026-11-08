@@ -1103,15 +1103,15 @@
           </div>
         </div>
         <div class="stats">
-          <div class="stat hover-glow" onpointermove={moveHoverLight}><small>SAVED EXPERIENCES</small><strong>{games.length.toString().padStart(2, "0")}</strong><span>In your personal library</span></div>
-          <div class="stat hover-glow" onpointermove={moveHoverLight}><small>BOOKMARKED SUBPLACES</small><strong>{games.reduce((n, g) => n + g.subplaces.length, 0).toString().padStart(2, "0")}</strong><span>Quick launch shortcuts</span></div>
-          <div class="stat hover-glow" onpointermove={moveHoverLight}><small>BACKGROUND REFRESH</small><strong>OFF</strong><span>Servers load only on request</span></div>
+          <div class="stat hover-glow"><small>SAVED EXPERIENCES</small><strong>{games.length.toString().padStart(2, "0")}</strong><span>In your personal library</span></div>
+          <div class="stat hover-glow"><small>BOOKMARKED SUBPLACES</small><strong>{games.reduce((n, g) => n + g.subplaces.length, 0).toString().padStart(2, "0")}</strong><span>Quick launch shortcuts</span></div>
+          <div class="stat hover-glow"><small>BACKGROUND REFRESH</small><strong>OFF</strong><span>Servers load only on request</span></div>
         </div>
         {#if quickLaunchItems.length}
           <div class="section-heading"><div><span class="eyebrow">ONE-CLICK LAUNCH</span><h2>Your favorites</h2></div><button class="link-button" onclick={() => tab = "library"}>Manage library ↗</button></div>
           <div class="quick-launch-grid">
             {#each quickLaunchItems as item (`${item.parentPlaceId}:${item.placeId}`)}
-              <div class="quick-game hover-glow" class:subplace={item.isSubplace} onpointermove={moveHoverLight}>
+              <div class="quick-game hover-glow" class:subplace={item.isSubplace}>
                 <button class="quick-game-main" onclick={() => play(item.placeId)} title={"Launch " + item.name} aria-label={"Launch " + item.name}>
                   <span class="game-tile quick-game-icon">{item.name.slice(0, 1).toUpperCase()}
                     {#if isTrustedIconUrl(item.iconUrl)}<img src={item.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
@@ -1533,7 +1533,7 @@
   </main>
   {#if loginStep}
     <div class="consent-overlay">
-      <section role="dialog" aria-modal="true" aria-labelledby="login-warning-title" class="consent-dialog">
+      <div role="dialog" aria-modal="true" aria-labelledby="login-warning-title" class="consent-dialog">
         <div class="consent-topline"><span class="consent-alert-icon">!</span><span>THIRST ACCOUNT CONNECTION · HIGH-RISK PERMISSION</span></div>
         {#if loginStep === "warning"}
           <h2 id="login-warning-title">Read before connecting your Roblox account.</h2>
@@ -1567,7 +1567,7 @@
             <button class="btn primary" onclick={completeLogin} disabled={loginBusy}>{loginBusy ? "Verifying with Roblox…" : "Finish connection"}</button>
           </div>
         {/if}
-      </section>
+      </div>
     </div>
   {/if}
   {#if toast}
