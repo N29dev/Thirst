@@ -84,7 +84,7 @@ fn normalise_result(source: ProviderServer, ids: &HashSet<String>) -> Option<Pro
 // Discord bot. A distributed Thirst build must never contain an API token:
 // this endpoint is read-only and limits lookups to active sampled BL:R servers.
 const GLUTONY_REGIONS_URL: &str =
-    "https://glutony.scp343hey.workers.dev/api/servers/regions/shared";
+    "https://glutony.scp343hey.workers.dev/api/servers/regions/lookup";
 
 fn glutony_mode(place_id: u64) -> Option<&'static str> {
     match place_id {
@@ -195,8 +195,9 @@ pub async fn lookup_rovalra_regions(
         .map_err(|_| "Could not configure the optional region lookup.".to_owned())?;
 
     // BL:R regions are first requested through Glutony's bounded D1-backed
-    // shared cache. When a server wasn't in the bot's recent public sample,
-    // direct RoValra remains a fallback rather than making it disappear.
+    // shared read-through cache. On D1 misses, Glutony itself queries RoValra
+    // and caches the result for the website and Discord bot. If Glutony is
+    // unavailable or rate-limited, direct RoValra remains a fallback.
     let mut shared = if glutony_mode(place_id).is_some() {
         lookup_shared_regions(&client, place_id, &sorted_ids, &ids)
             .await.unwrap_or_default()
