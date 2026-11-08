@@ -18,6 +18,10 @@ export function openThirstReleases(): Promise<void> {
   return invoke<void>("open_thirst_releases");
 }
 
+export function openThirstDevBuilds(): Promise<void> {
+  return invoke<void>("open_thirst_dev_builds");
+}
+
 import type { GameMetadata, ServerPage, SubplacesPage } from "./types";
 
 import type { PlayerSession } from "./activity";
