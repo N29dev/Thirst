@@ -521,6 +521,14 @@
       // If the selected subplace changes while a request is outstanding, ignore
       // the old result rather than mixing server lists from two places.
       if (activePlaceId !== requestedPlace) return;
+      if (!loadMore) {
+        // Thumbnails describe a momentary player sample, not stable identities.
+        // Refreshing servers invalidates those previews.
+        expandedPreviewId = null;
+        previewLoadingId = null;
+        avatarPreviews = {};
+        avatarErrors = {};
+      }
       servers = loadMore ?
         [...servers, ...result.data.filter(server => !servers.some(old => old.id === server.id))] :
         result.data;
@@ -832,7 +840,7 @@
               <span>{server.ping === null ? "—" : Math.round(server.ping) + " ms"}</span>
               <div class="server-actions">
                 <button class:saved={isSavedServer(server.id)} class="server-star" aria-pressed={isSavedServer(server.id)} title={isSavedServer(server.id) ? "Unsave this server" : "Save this server ID"} aria-label={isSavedServer(server.id) ? "Unsave server " + server.id : "Save server " + server.id} onclick={() => toggleSavedServer(server.id)}>{isSavedServer(server.id) ? "★" : "☆"}</button>
-                <button class:active={expandedPreviewId === server.id} class="server-preview-button" aria-expanded={expandedPreviewId === server.id} title="Show up to five anonymous player avatars" onclick={() => toggleServerPreview(server.id)}>Avatars</button>
+                <button class:active={expandedPreviewId === server.id} class="server-preview-button" aria-expanded={expandedPreviewId === server.id} disabled={previewLoadingId !== null && previewLoadingId !== server.id} title="Show up to five anonymous player avatars" onclick={() => toggleServerPreview(server.id)}>Avatars</button>
                 <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join ↗</button>
               </div>
             </div>
