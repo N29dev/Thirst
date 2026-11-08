@@ -12,6 +12,7 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 - Save favorite Roblox experiences using place IDs or official game URLs. Thirst retrieves their public names and icons on demand, with manual-name fallback.
 - Sort My Library by saved order, name A–Z, newest or oldest. **Import/export library backups** as JSON; imports merge saved games and pinned subplaces. Local-only, no cookies or Roblox credentials.
 - **Recent launches:** quick reopen of Roblox places previously opened through Thirst; these are launch requests, not proof of an actual join.
+- **Automatic Thirst update checks (not auto-install):** after startup Thirst checks the latest stable GitHub Release once, with a Settings opt-out and a manual Check now button. It compares semantic versions and opens the official releases page for installation. This does **not** download or execute developer builds. Currently no official releases have been published. Signed in-app installation requires a separately configured trusted update channel; see [Update guide](docs/UPDATES.md).
 - **Game history and rejoin (experimental):** opt-in native parser for local Roblox Player logs (up to 12 recent log tails), with a 30-day / 80-entry on-device history, optional public title/art lookup by button and an exact-server rejoin **only when the server is positively found** in at most three public server pages. Otherwise Thirst opens the game. No raw logs, credentials, or player network addresses enter the Svelte UI. Tracking runs while Overview is visible; not yet validated on a real current Roblox Player build. See [Activity guide](docs/ACTIVITY.md).
 - Save and launch individual subplaces under an experience, or discover publicly listed places on demand (with pagination).
 - Quickly launch saved experiences **and individually pinned subplaces** directly from the Overview grid (up to 24 tiles). Use the star next to a saved subplace to pin/unpin it; the tile's server button goes straight to that subplace's public servers.
@@ -59,7 +60,9 @@ Test bundling is enabled. Run `npm run bundle:mac` on macOS (Apple Silicon `.app
 | Roblox installer/updater | Not bundled; uses existing official Roblox installation |
 | Recent launches and local library backup/restore | Implemented |
 | Opt-in Roblox Player log history + conservative rejoin | Initial implementation; needs current macOS/Windows Roblox testing |
-| Rich Presence, themes, updates | Consider only when useful |
+| Thirst release checks | Implemented; no published GitHub Releases yet, installer remains manual |
+| Automatic signed Thirst installs | Pending Tauri signing keys, signed release artifacts and platform testing |
+| Rich Presence and themes | Future roadmap |
 | Attributed RoValra regions with flags | Experimental, on by default when manually refreshing servers; remembered opt-out; subject to provider terms |
 | Multi-instance and multi-account support | Research |
 | Ad-hoc signed macOS ARM64 / unsigned Windows test artifacts | CI packaging implemented; real-device testing required |
