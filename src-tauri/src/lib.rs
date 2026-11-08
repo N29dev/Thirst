@@ -261,26 +261,34 @@ async fn lookup_game(place_id: u64) -> Result<GameMetadata, String> {
     let game = details.pop().ok_or("No public experience details were found for that place.")?;
     validate_place_id(game.root_place_id)?;
 
-    // Game icons are optional. A timeout, moderation delay or missing thumbnail
-    // must never prevent a game from being bookmarked.
-    let icon_url = match client
-        .get("https://thumbnails.roblox.com/v1/games/icons")
-        .query(&[
-            ("universeIds", universe.universe_id.to_string()),
-            ("size", "150x150".to_owned()),
-            ("format", "Png".to_owned()),
-            ("isCircular", "false".to_owned()),
-        ])
-        .send().await
-    {
-        Ok(response) if response.status().is_success() => {
-            response.json::<ThumbnailsEnvelope>().await.ok()
-                .and_then(|envelope| envelope.data.into_iter().next())
-                .and_then(|item| item.image_url)
-                .filter(|uri| trusted_icon_url(uri))
+    // Request higher-resolution square artwork only when adding a game or
+    // explicitly pressing "Update icon". Roblox can reject unsupported sizes
+    // or return an unready image, so preserve the known-working 150x150 fallback.
+    // A missing icon must never prevent saving a game.
+    let mut icon_url = None;
+    for size in ["512x512", "150x150"] {
+        let response = client
+            .get("https://thumbnails.roblox.com/v1/games/icons")
+            .query(&[
+                ("universeIds", universe.universe_id.to_string()),
+                ("size", size.to_owned()),
+                ("format", "Png".to_owned()),
+                ("isCircular", "false".to_owned()),
+            ])
+            .send().await;
+
+        if let Ok(response) = response {
+            if response.status().is_success() {
+                icon_url = response.json::<ThumbnailsEnvelope>().await.ok()
+                    .and_then(|envelope| envelope.data.into_iter().next())
+                    .and_then(|item| item.image_url)
+                    .filter(|uri| trusted_icon_url(uri));
+                if icon_url.is_some() {
+                    break;
+                }
+            }
         }
-        _ => None,
-    };
+    }
 
     Ok(GameMetadata {
         universe_id: universe.universe_id,
