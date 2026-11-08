@@ -1,4 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
+
+export type ThirstUpdateCheck = {
+  currentVersion: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  releaseUrl: string;
+  notes: string | null;
+  status: "available" | "up-to-date" | "no-releases";
+};
+
+// Fixed GitHub API host in native Rust. Never downloads or installs executables.
+export function checkThirstUpdate(): Promise<ThirstUpdateCheck> {
+  return invoke<ThirstUpdateCheck>("check_thirst_update");
+}
+
+export function openThirstReleases(): Promise<void> {
+  return invoke<void>("open_thirst_releases");
+}
+
 import type { GameMetadata, ServerPage, SubplacesPage } from "./types";
 
 import type { PlayerSession } from "./activity";
