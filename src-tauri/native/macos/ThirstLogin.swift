@@ -189,9 +189,11 @@ final class RobloxLoginWindow: NSObject, NSApplicationDelegate, NSWindowDelegate
         parentTimer?.invalidate()
 
         // Only a fixed status word is printed; stdout is never a secret channel.
+        // The native parent observes the exit code instead of polling Keychain.
+        // 0 = a pending session was stored, 1 = cancelled / timed out / failed.
         print(result)
         fflush(stdout)
-        NSApp.terminate(nil)
+        Darwin.exit(result == "LOGIN_STORED" ? EXIT_SUCCESS : EXIT_FAILURE)
     }
 
     func windowWillClose(_ notification: Notification) {
