@@ -84,10 +84,65 @@ struct Batch {
     data: Vec<ResultItem>,
 }
 
+/// Both modes use only the fixed Roblox thumbnail host. Cookie mode is
+/// explicit opt-in, never the default. The bearer credential never crosses IPC.
+async fn request_thumbnail_batch(requests: &[Request], authenticated: bool) -> Result<Batch, String> {
+    use reqwest::header::COOKIE;
+
+    let session = if authenticated {
+        Some(crate::auth::thumbnail_session()?)
+    } else {
+        None
+    };
+    let client = public_client()?; // fixed HTTPS hosts; redirects disabled
+    let endpoint = "https://thumbnails.roblox.com/v1/batch";
+    let mut builder = client.post(endpoint).json(requests);
+    if let Some(cookie) = &session {
+        builder = builder.header(COOKIE, format!(".ROBLOSECURITY={cookie}"));
+    }
+    let mut response = builder.send().await
+        .map_err(|_| "Could not reach Roblox's thumbnail service.".to_owned())?;
+
+    // Roblox sometimes requires a CSRF challenge for cookie-authenticated
+    // POSTs. Retry at most once to the SAME fixed host, never a redirect.
+    if response.status().as_u16() == 403 && session.is_some() {
+        if let Some(csrf) = response.headers().get("x-csrf-token").cloned() {
+            let mut retry = client.post(endpoint).json(requests)
+                .header("x-csrf-token", csrf);
+            if let Some(cookie) = &session {
+                retry = retry.header(COOKIE, format!(".ROBLOSECURITY={cookie}"));
+            }
+            response = retry.send().await
+                .map_err(|_| "Roblox thumbnail authentication retry failed.".to_owned())?;
+        }
+    }
+
+    if response.status().as_u16() == 401 {
+        return Err("Roblox rejected the saved session. Check the account in Settings.".into());
+    }
+    if response.status().as_u16() == 403 {
+        return Err("Roblox blocked the thumbnail request (HTTP 403), including with the optional session. This may be a token or service limitation.".into());
+    }
+    if response.status().as_u16() == 429 {
+        return Err("Roblox rate-limited avatar previews. Try again later.".into());
+    }
+    if !response.status().is_success() {
+        return Err(format!("Roblox avatar previews unavailable (HTTP {}).", response.status().as_u16()));
+    }
+
+    // Session rotation is accepted only from the fixed Roblox thumbnail host.
+    if let Some(cookie) = &session {
+        crate::auth::rotate_thumbnail_session(cookie, response.headers())?;
+    }
+    response.json::<Batch>().await
+        .map_err(|_| "Roblox returned an unexpected thumbnail response.".to_owned())
+}
+
 #[tauri::command]
 pub async fn server_avatar_preview(
     place_id: u64,
     server_id: String,
+    authenticated: bool,
     cache: State<'_, PreviewCache>,
 ) -> Result<Vec<String>, String> {
     validate_place_id(place_id)?;
@@ -110,19 +165,7 @@ pub async fn server_avatar_preview(
             is_circular: false,
         })
         .collect();
-    let client = public_client()?;
-    let response = client.post("https://thumbnails.roblox.com/v1/batch")
-        .json(&requests)
-        .send().await
-        .map_err(|_| "Roblox's public thumbnail service is currently unreachable.".to_owned())?;
-    if response.status().as_u16() == 429 {
-        return Err("Roblox rate-limited avatar previews. Try later.".into());
-    }
-    if !response.status().is_success() {
-        return Err(format!("Roblox avatar previews unavailable (HTTP {}).", response.status().as_u16()));
-    }
-    let data = response.json::<Batch>().await
-        .map_err(|_| "Roblox returned an unexpected avatar preview response.".to_owned())?;
+    let data = request_thumbnail_batch(&requests, authenticated).await?;
     Ok(data.data.into_iter().filter_map(|item| {
         if item.state.as_deref() != Some("Completed") { return None; }
         item.image_url.filter(|value| value.len() <= 1200 && trusted_icon_url(value))
@@ -136,6 +179,7 @@ pub async fn server_avatar_preview(
 pub async fn server_avatar_previews(
     place_id: u64,
     server_ids: Vec<String>,
+    authenticated: bool,
     cache: State<'_, PreviewCache>,
 ) -> Result<HashMap<String, Vec<String>>, String> {
     validate_place_id(place_id)?;
@@ -175,20 +219,7 @@ pub async fn server_avatar_previews(
         return Ok(output);
     }
 
-    let client = public_client()?;
-    let response = client.post("https://thumbnails.roblox.com/v1/batch")
-        .json(&requests)
-        .send().await
-        .map_err(|_| "Roblox avatar previews could not be reached.".to_owned())?;
-    if response.status().as_u16() == 429 {
-        return Err("Roblox rate-limited avatar previews.".into());
-    }
-    if !response.status().is_success() {
-        return Err(format!("Roblox avatar previews unavailable (HTTP {}).", response.status().as_u16()));
-    }
-
-    let results = response.json::<Batch>().await
-        .map_err(|_| "Unexpected Roblox avatar thumbnail response.".to_owned())?;
+    let results = request_thumbnail_batch(&requests, authenticated).await?;
     for item in results.data.into_iter().take(40) {
         if item.state.as_deref() != Some("Completed") { continue; }
         let Some(request_id) = item.request_id else { continue };
