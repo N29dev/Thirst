@@ -421,7 +421,7 @@
     </nav>
     <div class="sidebar-bottom">
       <div class="sidebar-note"><span class="note-indicator"></span><span>Local-first · No account needed</span></div>
-      <div class="version">THIRST ALPHA <span>0.1.0</span></div>
+      <div class="version">THIRST ALPHA <span>0.3.0</span></div>
     </div>
   </aside>
 

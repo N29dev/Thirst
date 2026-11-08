@@ -23,10 +23,10 @@ This document tracks features requested during the first successful macOS alpha 
 
 ## Alpha 0.3 — Account and consent
 
-- [ ] AppleBlox-style **official Roblox browser login**, in an isolated native context.
-- [ ] macOS Keychain and Windows Credential Manager handling in native Rust/OS code only.
-- [ ] Strict allowlist for authenticated Roblox endpoints, no third-party transfers, no cookie injection into the Svelte frontend, no plugins holding raw secrets.
-- [ ] Account-level features behind an explicit opt-in, with sign-out/revocation controls.
+- [x] Experimental AppleBlox-style **official Roblox browser login** in an incognito native context, with a native-enforced 15-second consent review.
+- [x] macOS Keychain and Windows Credential Manager handling in native Rust/OS code only (implementation; real-device testing ongoing).
+- [x] Strict allowlist for the initial authenticated Roblox verification endpoint, no third-party cookie transfers, no cookie in Svelte or plugins.
+- [x] Opt-in connected account profile and local sign-out. Roblox server-side session revocation remains a manual Roblox Settings action.
 - [ ] Security threat model, tests, and independent review prior to public beta.
 
 ## Alpha 0.4 — Advanced server tools
