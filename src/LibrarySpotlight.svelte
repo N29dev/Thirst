@@ -24,16 +24,16 @@
 
 <style>
   .library-hero{
-    display:flex;align-items:center;gap:20px;min-width:0;
-    padding:19px;border:1px solid #365b70;border-radius:17px;
-    background:radial-gradient(ellipse at 5% 5%,#43899d27,transparent 54%),
-      linear-gradient(105deg,#193748,#142b3c 70%,#122536);
-    box-shadow:inset 0 1px 0 #dffaff15;
+    display:flex;align-items:center;gap:15px;min-width:0;
+    padding:0 0 17px;
+    border:0;border-bottom:1px solid #304a5d;border-radius:0;
+    background:transparent;
+    box-shadow:none;
   }
   .library-hero-art{
-    display:block;flex:0 0 118px;width:118px;height:118px;overflow:hidden;
-    border:1px solid #79b5cb80;border-radius:19px;background:#173d53;
-    box-shadow:0 13px 24px #07152275;
+    display:block;flex:0 0 94px;width:94px;aspect-ratio:1 / 1;overflow:hidden;
+    border:1px solid #79b5cb80;border-radius:13px;background:#173d53;
+    box-shadow:0 6px 14px #07152255;
   }
   .library-hero-copy{min-width:0;flex:1}
   .library-hero-kicker{
@@ -42,8 +42,8 @@
   }
   .library-hero-dot{width:6px;height:6px;border-radius:50%;background:#8adbd9;box-shadow:0 0 9px #5dd6ce6e}
   h2{
-    color:#ebfaff;font-size:clamp(19px,2.1vw,28px);line-height:1.22;letter-spacing:-.65px;
-    margin:10px 0;font-weight:830;overflow-wrap:anywhere
+    color:#ebfaff;font-size:clamp(18px,1.8vw,23px);line-height:1.22;letter-spacing:-.65px;
+    margin:7px 0;font-weight:800;overflow-wrap:anywhere
   }
   .library-hero-meta{
     display:flex;align-items:center;gap:10px;flex-wrap:wrap;
@@ -51,14 +51,14 @@
   }
   .library-meta-sep{width:3px;height:3px;border-radius:50%;background:#547d91;flex:none}
   @media(max-width:680px){
-    .library-hero{padding:14px;gap:12px}
-    .library-hero-art{flex-basis:88px;width:88px;height:88px;border-radius:13px}
+    .library-hero{padding:0 0 14px;gap:12px}
+    .library-hero-art{flex-basis:76px;width:76px;border-radius:11px}
     h2{font-size:19px;margin:7px 0}
     .library-hero-meta{font-size:10px;gap:6px}
   }
   @media(max-width:460px){
     .library-hero{align-items:flex-start}
-    .library-hero-art{flex-basis:72px;width:72px;height:72px;border-radius:12px}
+    .library-hero-art{flex-basis:64px;width:64px;border-radius:10px}
     h2{font-size:17px}
     .library-hero-kicker{font-size:8px;letter-spacing:1px}
   }
