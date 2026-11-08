@@ -60,7 +60,19 @@ jobs:
       - name: Install frontend
         run: npm install --no-audit --no-fund
       - name: Build Windows unsigned installer
-        run: npm run bundle:windows
+        shell: pwsh
+        run: |
+          # NSIS helper downloads occasionally return HTTP 504 from GitHub.
+          # Reuse the compiled Rust release on retry; don't force another clean build.
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            npm run bundle:windows
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -lt 3) {
+              Write-Warning "Packaging attempt $attempt failed; retrying after 15 seconds."
+              Start-Sleep -Seconds 15
+            }
+          }
+          exit 1
       - uses: actions/upload-artifact@v4
         with:
           name: Thirst-Windows-unsigned
