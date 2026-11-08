@@ -5,18 +5,18 @@ export function launchPlace(placeId: number, jobId: string | null = null): Promi
   return invoke<void>("launch_place", { placeId, jobId });
 }
 
-export function fetchPublicServers(placeId: number, cursor: string | null): Promise<ServerPage> {
-  return invoke<ServerPage>("list_public_servers", { placeId, cursor });
+export function fetchPublicServers(placeId: number, cursor: string | null, authenticated = false): Promise<ServerPage> {
+  return invoke<ServerPage>("list_public_servers", { placeId, cursor, authenticated });
 }
 
-// Public anonymous avatar thumbnails only. No user IDs or raw player tokens reach Svelte.
-export function fetchServerAvatarPreview(placeId: number, serverId: string): Promise<string[]> {
-  return invoke<string[]>("server_avatar_preview", { placeId, serverId });
+// Anonymous player-token requests, optionally using an OS-stored session in native Rust. The cookie never crosses IPC.
+export function fetchServerAvatarPreview(placeId: number, serverId: string, authenticated = false): Promise<string[]> {
+  return invoke<string[]>("server_avatar_preview", { placeId, serverId, authenticated });
 }
 
-// One cookie-free request for up to eight servers' anonymous avatar images.
-export function fetchServerAvatarPreviews(placeId: number, serverIds: string[]): Promise<Record<string, string[]>> {
-  return invoke<Record<string, string[]>>("server_avatar_previews", { placeId, serverIds });
+// One bounded request for up to eight servers' anonymous avatar images.
+export function fetchServerAvatarPreviews(placeId: number, serverIds: string[], authenticated = false): Promise<Record<string, string[]>> {
+  return invoke<Record<string, string[]>>("server_avatar_previews", { placeId, serverIds, authenticated });
 }
 
 export function lookupGame(placeId: number): Promise<GameMetadata> {
