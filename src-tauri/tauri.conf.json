@@ -28,6 +28,11 @@
   },
   "bundle": {
     "active": true,
-    "resources": ["resources/*"]
+    "resources": [
+      "resources/*"
+    ],
+    "macOS": {
+      "signingIdentity": "-"
+    }
   }
 }
