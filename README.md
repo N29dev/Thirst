@@ -43,7 +43,7 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Native bundling is currently disabled in `src-tauri/tauri.conf.json`. The macOS Swift helper is compiled by `swiftc` during a **developer build** and is loaded from Cargo's output directory; packaged apps still need signed sidecar distribution. Xcode Command Line Tools are required on macOS. Signed macOS / Windows installers will be part of a later milestone.
+Unsigned test bundling is enabled. Run `npm run bundle:mac` on macOS (Apple Silicon `.app` including the native Swift/WKWebView login helper) or `npm run bundle:windows` on Windows (NSIS installer). GitHub Actions can build these artifacts through [the unsigned test-bundle workflow](https://github.com/N29dev/Thirst/actions/workflows/package.yml). The macOS helper is compiled into the app resources for packaging; development builds keep using Cargo's helper. Xcode Command Line Tools are required for local macOS compilation. **These are test builds**, not signed/notarized public releases; see [Release guide](docs/RELEASE.md).
 
 ## Roadmap
 
@@ -60,7 +60,8 @@ Native bundling is currently disabled in `src-tauri/tauri.conf.json`. The macOS 
 | Rich Presence, themes, updates | Consider only when useful |
 | Attributed RoValra regions with flags | Experimental, on by default when manually refreshing servers; remembered opt-out; subject to provider terms |
 | Multi-instance and multi-account support | Research |
-| Signed, tested macOS and Windows releases | Planned |
+| Unsigned macOS ARM64 / Windows test artifacts | CI packaging implemented; real-device testing required |
+| Signed, notarized macOS and Windows releases | Not yet released; certificates and verification required |
 
 ## macOS Keychain permission prompts
 

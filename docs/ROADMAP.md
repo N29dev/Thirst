@@ -55,7 +55,8 @@ This document tracks features requested during the first successful macOS alpha 
 - [ ] Optional Discord Rich Presence if local game activity can be confirmed. Avoid a duplicate Roblox installer/updater, plugins, or themes without a real user need.
 - [ ] Multi-instance and multi-account options only when stable and compliant.
 - [ ] Plugin API with narrowly scoped permissions and no credential access.
-- [ ] Cross-platform packaging, startup/idle CPU+RAM benchmarks, and signed releases.
+- [x] Unsigned test-app packaging automation for macOS ARM64 and Windows, with the native macOS login helper in the bundled resources.
+- [ ] Real-device smoke tests, startup/idle CPU+RAM benchmarks, verified code signing and notarized public releases.
 
 ## Design principles
 
