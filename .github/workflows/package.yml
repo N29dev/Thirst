@@ -1,0 +1,62 @@
+name: Thirst unsigned test bundles
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/package.yml'
+      - 'scripts/prepare_macos_bundle.sh'
+      - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/src/auth.rs'
+
+permissions:
+  contents: read
+
+jobs:
+  macos-arm64:
+    name: macOS ARM64 app
+    runs-on: macos-15-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - name: Install frontend
+        run: npm install --no-audit --no-fund
+      - name: Build macOS app including native Roblox login
+        run: npm run bundle:mac
+      - name: Inspect bundled login helper
+        run: |
+          test -x src-tauri/target/release/bundle/macos/Thirst.app/Contents/Resources/resources/ThirstLogin
+          file src-tauri/target/release/bundle/macos/Thirst.app/Contents/Resources/resources/ThirstLogin
+      - name: Archive unsigned macOS app
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          ditto -c -k --sequesterRsrc --keepParent Thirst.app "$GITHUB_WORKSPACE/Thirst-macOS-arm64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Thirst-macOS-arm64-unsigned
+          path: Thirst-macOS-arm64.zip
+          if-no-files-found: error
+
+  windows:
+    name: Windows NSIS installer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install frontend
+        run: npm install --no-audit --no-fund
+      - name: Build Windows unsigned installer
+        run: npm run bundle:windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Thirst-Windows-unsigned
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
