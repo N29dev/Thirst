@@ -586,8 +586,12 @@
         bulkPreviewError = String(error);
       }
     } finally {
+      const wasSuperseded = version !== bulkPreviewVersion;
       bulkPreviewBusy = false;
       bulkPreviewRequested = [];
+      // If the user changed place or refreshed mid-request, load the new
+      // server batch once the previous network request has settled.
+      if (wasSuperseded && tab === "servers") void loadAutomaticAvatars();
     }
   }
 
@@ -875,7 +879,7 @@
               </div>
             </div>
             {#if expandedPreviewId === server.id || (autoAvatarEnabled && connectedAccount && !liteMode && ((avatarPreviews[server.id]?.length ?? 0) > 0 || (bulkPreviewBusy && bulkPreviewRequested.includes(server.id))))}
-              <div class="server-avatar-panel">
+              <div class="server-avatar-panel" class:auto-loaded={expandedPreviewId !== server.id}>
                 <span class="preview-caption">Anonymous public avatar previews · no player names or IDs</span>
                 {#if previewLoadingId === server.id || (bulkPreviewBusy && bulkPreviewRequested.includes(server.id))}
                   <span class="preview-status">Requesting up to five anonymous thumbnails from Roblox…</span>
