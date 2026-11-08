@@ -90,7 +90,6 @@
   let rovalraError = "";
   let providerRegions: Record<string, ProviderRegion> = {};
   let rovalraCheckedIds = new Set<string>();
-  let rovalraLastCheckedAt: Record<string, number> = {};
   let editingRegionId: string | null = null;
   let regionDraft: RegionCode | "" = "";
   let serverLoadError = "";
@@ -618,7 +617,6 @@
     regionDraft = "";
     providerRegions = {};
     rovalraCheckedIds = new Set<string>();
-    rovalraLastCheckedAt = {};
     rovalraError = "";
     expandedPreviewId = null;
     previewLoadingId = null;
@@ -673,7 +671,6 @@
     regionDraft = "";
     providerRegions = {};
     rovalraCheckedIds = new Set<string>();
-    rovalraLastCheckedAt = {};
     rovalraError = "";
     expandedPreviewId = null;
     previewLoadingId = null;
@@ -750,7 +747,6 @@
     rovalraError = "";
     providerRegions = {};
     rovalraCheckedIds = new Set<string>();
-    rovalraLastCheckedAt = {};
     try { writeRoValraEnabled(enabled); }
     catch { notice("Could not save RoValra preference on this device.", "bad"); }
     if (enabled) {
@@ -764,28 +760,16 @@
   async function loadRoValraRegions() {
     if (!rovalraEnabled || rovalraLoading || !activePlaceId || !servers.length) return;
     const placeId = activePlaceId;
-    const now = Date.now();
-    // Direct-only results have not been saved into Glutony D1. Allow a
-    // manual retry so they can become shared when the Worker becomes ready.
+    // There is no local retry timer. Prefer UUIDs we have not checked yet,
+    // but let the user immediately retry Unknown and direct-only results.
     const unresolved = servers.map(server => server.id)
       .filter(isValidServerId)
       .filter(id => !providerRegions[id.toLowerCase()] ||
         providerRegions[id.toLowerCase()].via === "direct");
-    const ids = unresolved
-      // A missing region can be retried after one minute. Previously,
-      // every checked UUID was permanently excluded until full Refresh.
-      .filter(id => now - (rovalraLastCheckedAt[id.toLowerCase()] ?? 0) >= 60_000)
-      .slice(0, 25);
+    const unchecked = unresolved.filter(id => !rovalraCheckedIds.has(id.toLowerCase()));
+    const ids = (unchecked.length ? unchecked : unresolved).slice(0, 25);
     if (!ids.length) {
-      if (unresolved.length) {
-        const wait = Math.max(1, Math.ceil(Math.min(...unresolved.map(id =>
-          60_000 - (now - (rovalraLastCheckedAt[id.toLowerCase()] ?? 0))
-        )) / 1000));
-        notice("Unknown or direct-only regions may be retried in " + wait +
-          "s. RoValra may not have a location for some servers yet.");
-      } else {
-        notice("Every loaded server has a shared Glutony region. Load more Roblox servers to check others.");
-      }
+      notice("Every loaded server has a shared Glutony region. Load more Roblox servers to check others.");
       return;
     }
     rovalraLoading = true;
@@ -801,17 +785,13 @@
       }
       providerRegions = { ...providerRegions, ...byId };
       rovalraCheckedIds = new Set([...rovalraCheckedIds, ...ids.map(id => id.toLowerCase())]);
-      rovalraLastCheckedAt = {
-        ...rovalraLastCheckedAt,
-        ...Object.fromEntries(ids.map(id => [id.toLowerCase(), Date.now()]))
-      };
       const shared = response.filter(item => item.via === "glutony").length;
       const direct = response.filter(item => item.via === "direct").length;
       const unknown = ids.length - Object.keys(byId).length;
       notice("Found regions for " + Object.keys(byId).length + " of " + ids.length +
         " checked servers (" + shared + " shared with Glutony, " + direct + " direct-only)" +
         (direct ? ". Direct-only results are not saved to your BLR website or bot." : "") +
-        (unknown ? " " + unknown + " unknown; retry after one minute." : ""));
+        (unknown ? " " + unknown + " unknown; you can retry now." : ""));
     } catch (error) {
       if (rovalraEnabled && activePlaceId === placeId) {
         rovalraError = String(error);
@@ -928,8 +908,7 @@
         avatarErrors = {};
         providerRegions = {};
         rovalraCheckedIds = new Set<string>();
-        rovalraLastCheckedAt = {};
-        rovalraError = "";
+            rovalraError = "";
         bulkPreviewVersion++;
         bulkPreviewRequested = [];
       }
@@ -1364,7 +1343,7 @@
             <button class="btn secondary small" disabled={!rovalraEnabled || rovalraLoading || !servers.length} onclick={loadRoValraRegions}>
               {rovalraLoading ? "Finding regions…" : "↻ Look up regions"}
             </button>
-            <span class="provider-note">BLR regions first check Glutony D1, which can fetch RoValra data for missing IDs and save it. Unknown locations can be retried after 60s. Only public server IDs are shared; no Roblox cookies. If D1 migrations are missing, direct fallback results will not sync to your website or bot.</span>
+            <span class="provider-note">BLR regions first check Glutony D1, which can fetch RoValra data for missing IDs and save it. Unknown locations can be retried immediately. Provider-side rate limits still apply. Only public server IDs are shared; no Roblox cookies. If D1 migrations are missing, direct fallback results will not sync to your website or bot.</span>
             <a class="provider-credit" href="https://www.rovalra.com/" target="_blank" rel="noopener noreferrer">Region data by RoValra ↗</a>
           </div>
           <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Regions are Unknown until RoValra reports a location or you add a local observation. RoValra lookup is on by default and can be disabled above. RoValra results are provider-reported, not independently verified by Thirst; local observations expire after two hours. Connected users can see automatic anonymous avatar previews for up to eight loaded servers (unless disabled or in Lite Mode).</div>
