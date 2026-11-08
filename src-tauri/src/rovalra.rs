@@ -219,27 +219,43 @@ pub async fn lookup_rovalra_regions(
             ("place_id", place_id.to_string()),
             ("server_ids", missing.join(",")),
         ])
-        .send().await
-        .map_err(|_| "RoValra is unreachable for servers not yet cached by Glutony.".to_owned())?;
+        .send().await;
+    let response = match response {
+        Ok(response) => response,
+        Err(_) if !shared.is_empty() => return Ok(shared),
+        Err(_) => return Err("RoValra is unreachable for servers not yet cached by Glutony.".into()),
+    };
 
     match response.status().as_u16() {
         429 => {
             if let Ok(mut next) = state.next_allowed.lock() {
                 *next = Some(Instant::now() + RATE_LIMIT_COOLDOWN);
             }
+            if !shared.is_empty() { return Ok(shared); }
             return Err("RoValra rate-limited the region lookup; try again later.".into());
         }
         401 | 403 => return Err("RoValra did not permit this request. Region lookup has been stopped; use local region reports.".into()),
         200 => {}
+        status if !shared.is_empty() => { let _ = status; return Ok(shared); }
         status => return Err(format!("RoValra region lookup unavailable (HTTP {status}).")),
     }
-    let body = response.bytes().await
-        .map_err(|_| "Could not read RoValra's region response.".to_owned())?;
+    let body = match response.bytes().await {
+        Ok(bytes) => bytes,
+        Err(_) if !shared.is_empty() => return Ok(shared),
+        Err(_) => return Err("Could not read RoValra's region response.".into())
+    };
     if body.len() > 256 * 1024 {
-        return Err("RoValra returned an unexpectedly large response.".into());
+        return if shared.is_empty() {
+            Err("RoValra returned an unexpectedly large response.".into())
+        } else {
+            Ok(shared)
+        };
     }
-    let envelope: ProviderEnvelope = serde_json::from_slice(&body)
-        .map_err(|_| "RoValra region data format is currently unsupported.".to_owned())?;
+    let envelope: ProviderEnvelope = match serde_json::from_slice(&body) {
+        Ok(value) => value,
+        Err(_) if !shared.is_empty() => return Ok(shared),
+        Err(_) => return Err("RoValra region data format is currently unsupported.".into())
+    };
     if envelope.disabled {
         if let Ok(mut next) = state.next_allowed.lock() {
             *next = Some(Instant::now() + RATE_LIMIT_COOLDOWN);
@@ -247,7 +263,11 @@ pub async fn lookup_rovalra_regions(
         return Err("RoValra disabled region lookup for this experience.".into());
     }
     if envelope.status.as_deref() != Some("success") {
-        return Err("RoValra did not return a successful region lookup.".into());
+        return if shared.is_empty() {
+            Err("RoValra did not return a successful region lookup.".into())
+        } else {
+            Ok(shared)
+        };
     }
     shared.extend(envelope.servers.into_iter()
         .filter_map(|item| normalise_result(item, &ids))
