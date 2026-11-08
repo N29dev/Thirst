@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
+  import {readRecentLaunches, recordRecentLaunch, clearRecentLaunches, recentPlaceName} from "./lib/recent";
+  import type {RecentLaunch} from "./lib/recent";
+  import {exportLibraryJson, importLibraryJson, mergeImportedLibrary} from "./lib/library-backup";
   import {
     beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
     disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview, fetchServerAvatarPreviews,
@@ -29,6 +32,7 @@
   };
   let tab: Tab = "home";
   let games: SavedGame[] = [];
+  let recentLaunches: RecentLaunch[] = [];
   let selectedId: number | null = null;
   let activePlaceId: number | null = null;
   let newName = "";
@@ -141,6 +145,7 @@
 
   onMount(() => {
     games = readLibrary();
+    recentLaunches = readRecentLaunches();
     regionReports = readRegionReports();
     rovalraEnabled = readRoValraEnabled();
     selectedId = games[0]?.placeId ?? null;
@@ -569,6 +574,49 @@
     }
   }
 
+  function downloadLibraryBackup() {
+    try {
+      const blob = new Blob([exportLibraryJson(games)],{type:"application/json;charset=utf-8"});
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "thirst-library.json";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      notice("Library backup exported. Roblox credentials are not included.");
+    } catch (error) {
+      notice("Could not export library: " + String(error), "bad");
+    }
+  }
+
+  async function importLibraryBackup(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > 1_000_000) throw Error("Library backup is larger than 1 MB.");
+      const restored = importLibraryJson(await file.text());
+      const before = games.length;
+      games = mergeImportedLibrary(games,restored);
+      persist();
+      if (!selectedId && games.length) selectGame(games[0].placeId);
+      notice("Merged library backup. Added " + (games.length-before) + " experiences and kept your existing bookmarks.");
+    } catch (error) {
+      notice("Could not import library: " + String(error), "bad");
+    } finally {
+      input.value = "";
+    }
+  }
+
+  function clearRecent() {
+    try {
+      recentLaunches = clearRecentLaunches();
+      notice("Recently opened games cleared.");
+    } catch {
+      notice("Could not clear local recent history.", "bad");
+    }
+  }
+
   function setLibrarySort(sort: LibrarySort) {
     librarySort = sort;
     try { writeLibrarySort(sort); }
@@ -704,6 +752,11 @@
   async function play(placeId: number, jobId: string | null = null) {
     try {
       await launchPlace(placeId, jobId);
+      try {
+        recentLaunches = recordRecentLaunch(placeId, recentPlaceName(games,placeId));
+      } catch {
+        // History never prevents starting Roblox.
+      }
       notice(jobId ? "Opening selected server in Roblox…" : "Opening Roblox…");
     } catch (error) {
       notice(String(error), "bad");
@@ -945,6 +998,21 @@
             <p class="form-hint">Showing the first 24 shortcuts. Your other saved places remain available in My Library.</p>
           {/if}
         {/if}
+        {#if recentLaunches.length}
+          <div class="section-heading recent-heading">
+            <div><span class="eyebrow">RECENTLY OPENED</span><h2>Quick rejoin</h2></div>
+            <button class="link-button" onclick={clearRecent}>Clear history</button>
+          </div>
+          <div class="recent-launch-list">
+            {#each recentLaunches.slice(0,5) as item (item.placeId)}
+              <button class="recent-launch-item" title={"Open " + item.name} onclick={() => play(item.placeId)}>
+                <span class="recent-symbol">▶</span>
+                <span class="recent-label"><strong>{item.name}</strong><small>Place ID {item.placeId}</small></span>
+                <span class="recent-go">↗</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
         <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>Your workspace</h2></div></div>
         <div class="feature-grid">
           <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "library"}><div class="feature-symbol">▦</div><h3>Game library</h3><p>Save experiences and individual subplaces. No account required.</p><span class="feature-link">Explore library ↗</span></button>
@@ -953,6 +1021,14 @@
         </div>
       {:else if tab === "library"}
         <div class="page-title"><div><span class="eyebrow">YOUR COLLECTION</span><h1>Game library</h1><p>Bookmark experiences and their individual Roblox places.</p></div><span class="count-badge">{games.length} SAVED</span></div>
+        <div class="library-backup-actions">
+          <span>Portable bookmarks and subplace pins · no Roblox sessions included</span>
+          <div>
+            <button class="btn secondary small" onclick={downloadLibraryBackup} disabled={!games.length}>↓ Export library</button>
+            <input id="library-import" type="file" class="library-import-input" accept=".json,application/json" onchange={importLibraryBackup} />
+            <label for="library-import" class="btn secondary small library-import-label">↑ Import backup</label>
+          </div>
+        </div>
         <div class="library-layout">
           <div class="panel">
             <div class="panel-header"><h3>Saved experiences</h3></div>
