@@ -5,6 +5,7 @@
 //! unsigned GitHub Actions artifacts must never be auto-installed.
 
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 use std::time::Duration;
 
 const RELEASES_API: &str = "https://api.github.com/repos/N29dev/Thirst/releases/latest";
