@@ -43,7 +43,7 @@ npm run build
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
-Unsigned test bundling is enabled. Run `npm run bundle:mac` on macOS (Apple Silicon `.app` including the native Swift/WKWebView login helper) or `npm run bundle:windows` on Windows (NSIS installer). GitHub Actions can build these artifacts through [the unsigned test-bundle workflow](https://github.com/N29dev/Thirst/actions/workflows/package.yml). The macOS helper is compiled into the app resources for packaging; development builds keep using Cargo's helper. Xcode Command Line Tools are required for local macOS compilation. **These are test builds**, not signed/notarized public releases; see [Release guide](docs/RELEASE.md).
+Test bundling is enabled. Run `npm run bundle:mac` on macOS (Apple Silicon `.app` including the Swift/WKWebView login helper) or `npm run bundle:windows` on Windows (NSIS installer). GitHub Actions builds these artifacts through [the test-bundle workflow](https://github.com/N29dev/Thirst/actions/workflows/package.yml). The macOS app and its login helper are now **ad-hoc signed** and verified in CI, but they are **not Developer ID signed or notarized**, so macOS may still require an individual exception in Privacy & Security. Xcode Command Line Tools are required for local builds. Read [the release and Gatekeeper troubleshooting guide](docs/RELEASE.md) before installing.
 
 ## Roadmap
 
@@ -60,7 +60,7 @@ Unsigned test bundling is enabled. Run `npm run bundle:mac` on macOS (Apple Sili
 | Rich Presence, themes, updates | Consider only when useful |
 | Attributed RoValra regions with flags | Experimental, on by default when manually refreshing servers; remembered opt-out; subject to provider terms |
 | Multi-instance and multi-account support | Research |
-| Unsigned macOS ARM64 / Windows test artifacts | CI packaging implemented; real-device testing required |
+| Ad-hoc signed macOS ARM64 / unsigned Windows test artifacts | CI packaging implemented; real-device testing required |
 | Signed, notarized macOS and Windows releases | Not yet released; certificates and verification required |
 
 ## macOS Keychain permission prompts
