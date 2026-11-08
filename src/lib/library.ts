@@ -73,6 +73,20 @@ export function writeAutoAvatarPreviews(enabled: boolean): void {
   localStorage.setItem(AUTO_AVATAR_KEY, enabled ? "on" : "off");
 }
 
+// Non-sensitive UI preference, independent of the order in which bookmarks
+// are stored. The default is the existing saved order.
+const LIBRARY_SORT_KEY = "thirst.preferences.library-sort.v1";
+export type LibrarySort = "saved" | "name" | "newest" | "oldest";
+
+export function readLibrarySort(): LibrarySort {
+  const value = localStorage.getItem(LIBRARY_SORT_KEY);
+  return value === "name" || value === "newest" || value === "oldest" ? value : "saved";
+}
+
+export function writeLibrarySort(value: LibrarySort): void {
+  localStorage.setItem(LIBRARY_SORT_KEY, value);
+}
+
 export function parsePlaceId(text: string): number | null {
   const raw = text.trim();
   const match = raw.match(/^https:\/\/(?:www\.)?roblox\.com\/games\/(\d+)(?:[/?#].*)?$/i);
