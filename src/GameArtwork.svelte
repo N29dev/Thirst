@@ -17,11 +17,10 @@
   $: fallback = (name.trim().charAt(0) || "?").toUpperCase();
 </script>
 
-<!-- Explicit square grid sizing avoids a WebKit layout issue with nested
-     height:100% and absolutely positioned images inside aspect-ratio boxes.
-     The placeholder stays underneath the image, not in a different layer. -->
-<div class="game-art" class:tile={variant === "tile"} aria-hidden="true">
-  <span class="art-fallback">{fallback}</span>
+<!-- A normal-flow square image: no absolute positioning, percent heights,
+     clipping transforms or overlaid fallback that might hide the artwork in
+     macOS WebKit. The fallback is rendered only if the URL is unusable. -->
+<div class="game-art" aria-hidden="true">
   {#if safeUrl && !failed}
     {#key safeUrl}
       <img
@@ -35,48 +34,42 @@
         onerror={() => { failed = true; }}
       />
     {/key}
+  {:else}
+    <span class="art-fallback" class:tile={variant === "tile"}>{fallback}</span>
   {/if}
 </div>
 
 <style>
-  .game-art {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-    border-radius: inherit;
-    background: #213b51;
+  .game-art{
+    display:block;
+    width:100%;
+    aspect-ratio:1 / 1;
+    overflow:hidden;
+    min-width:0;
+    background:#24445a;
+    border-radius:inherit;
   }
-  .art-fallback, img {
-    grid-column: 1;
-    grid-row: 1;
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    min-height: 0;
+  img{
+    display:block;
+    width:100%;
+    height:auto;
+    aspect-ratio:1 / 1;
+    object-fit:cover;
+    object-position:center;
+    max-width:100%;
+    border:0;
+    border-radius:inherit;
   }
-  .art-fallback {
-    display: grid;
-    place-items: center;
-    background: linear-gradient(145deg, #315b73, #1d344a);
-    color: #e0f7fb;
-    font-size: 42px;
-    font-weight: 800;
-    line-height: 1;
+  .art-fallback{
+    display:grid;
+    place-items:center;
+    width:100%;
+    aspect-ratio:1 / 1;
+    background:linear-gradient(145deg,#315b73,#1d344a);
+    color:#e0f7fb;
+    font-size:42px;
+    font-weight:800;
+    line-height:1;
   }
-  .tile .art-fallback { font-size: 23px; }
-  img {
-    z-index: 1;
-    object-fit: cover;
-    object-position: center;
-    max-width: 100%;
-    max-height: 100%;
-    border: 0;
-    border-radius: inherit;
-  }
+  .tile{font-size:23px}
 </style>
