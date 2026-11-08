@@ -4,6 +4,7 @@
 mod auth;
 mod server_previews;
 mod rovalra;
+mod fastflags;
 
 use std::time::Duration;
 use tauri_plugin_opener::OpenerExt;
@@ -329,6 +330,8 @@ pub fn run() {
             lookup_game,
             discover_subplaces,
             platform_name,
+            fastflags::read_fast_flags,
+            fastflags::write_fast_flags,
             auth::begin_roblox_consent,
             auth::open_roblox_login,
             auth::roblox_login_status,

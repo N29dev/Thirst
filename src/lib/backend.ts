@@ -42,6 +42,16 @@ export function lookupRoValraRegions(placeId: number, serverIds: string[]): Prom
   return invoke<ProviderRegion[]>("lookup_rovalra_regions", { placeId, serverIds });
 }
 
+import type { FFlagStatus } from "./fastflags";
+
+export function readFastFlags(): Promise<FFlagStatus> {
+  return invoke<FFlagStatus>("read_fast_flags");
+}
+
+export function writeFastFlags(flags: Record<string, string>): Promise<FFlagStatus> {
+  return invoke<FFlagStatus>("write_fast_flags", { flags });
+}
+
 export function platformName(): Promise<string> {
   return invoke<string>("platform_name");
 }

@@ -247,7 +247,8 @@ mod tests {
         let folder = std::env::temp_dir().join(format!(
             "thirst-fastflags-test-{}-{}",
             std::process::id(),
-            std::thread::current().name().unwrap_or("flags")
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
         ));
         fs::create_dir_all(&folder).unwrap();
         let path = folder.join("ClientAppSettings.json");
