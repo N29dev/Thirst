@@ -37,6 +37,10 @@
   let discoveryCursor: string | null = null;
   let connectedAccount: ConnectedAccount | null = null;
   let checkingAccount = false;
+  // A single account-status lookup per app session avoids repeatedly
+  // requesting Keychain permission when navigating back to Settings.
+  // Users can still explicitly refresh with Check status.
+  let accountStatusLoaded = false;
   let accountError = "";
   let loginStep: "warning" | "browser" | null = null;
   let loginBusy = false;
@@ -85,6 +89,7 @@
       accountError = String(error);
     } finally {
       checkingAccount = false;
+      accountStatusLoaded = true;
     }
   }
 
@@ -165,6 +170,7 @@
     loginBusy = true;
     try {
       connectedAccount = await finishRobloxLogin();
+      accountStatusLoaded = true;
       accountError = "";
       loginStep = null;
       stopNativeLoginPolling();
@@ -193,6 +199,7 @@
     try {
       await disconnectRobloxAccount();
       connectedAccount = null;
+      accountStatusLoaded = true;
       accountError = "";
       notice("Thirst's saved Roblox session was deleted locally.");
     } catch (error) {
@@ -453,7 +460,7 @@
     </nav>
     <span class="section-label section-spaced">PREFERENCES</span>
     <nav aria-label="Preferences">
-      <button class:active={tab === "settings"} onclick={() => { tab = "settings"; void loadConnectedAccount(); }}><span class="nav-icon">⚙</span> Settings</button>
+      <button class:active={tab === "settings"} onclick={() => { tab = "settings"; if (!accountStatusLoaded) void loadConnectedAccount(); }}><span class="nav-icon">⚙</span> Settings</button>
     </nav>
     <div class="sidebar-bottom">
       <div class="sidebar-note"><span class="note-indicator"></span><span>Local-first · No account needed</span></div>
