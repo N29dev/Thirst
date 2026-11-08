@@ -74,6 +74,7 @@ fn platform_name() -> &'static str {
 async fn list_public_servers(
     place_id: u64,
     cursor: Option<String>,
+    authenticated: bool,
     previews: tauri::State<'_, server_previews::PreviewCache>,
 ) -> Result<ServerPage, String> {
     validate_place_id(place_id)?;
@@ -97,15 +98,26 @@ async fn list_public_servers(
         .build()
         .map_err(|_| "Could not configure the network client.".to_owned())?;
 
-    let response = client
+    let mut request = client
         .get(format!("https://games.roblox.com/v1/games/{place_id}/servers/Public"))
-        .query(&query)
-        .send()
-        .await
+        .query(&query);
+    // Explicit opt-in only. Never to RoValra, CDN hosts or the frontend.
+    let session = if authenticated { Some(auth::thumbnail_session()?) } else { None };
+    if let Some(cookie) = &session {
+        request = request.header(reqwest::header::COOKIE, format!(".ROBLOSECURITY={cookie}"));
+    }
+    let response = request.send().await
         .map_err(|_| "Roblox server list is currently unreachable.".to_owned())?;
+    if let Some(cookie) = &session {
+        // Only the fixed games.roblox.com host, redirects disabled.
+        auth::rotate_thumbnail_session(cookie, response.headers())?;
+    }
 
     if response.status().as_u16() == 429 {
         return Err("Roblox rate-limited this request. Try again later.".to_owned());
+    }
+    if authenticated && matches!(response.status().as_u16(), 401 | 403) {
+        return Err("Roblox rejected the optional authenticated server request. Turn off session-backed avatars in Settings to use public mode.".into());
     }
     if !response.status().is_success() {
         return Err(format!(
