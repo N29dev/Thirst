@@ -176,9 +176,10 @@ fn delete_session() -> Result<(), String> {
 }
 
 fn rotated_cookie(headers: &reqwest::header::HeaderMap) -> Option<String> {
-    // Roblox may rotate .ROBLOSECURITY in an HTTP Set-Cookie header.
-    // Only trust cookies from the *fixed* authenticated users.roblox.com host
-    // (this function must never be used with a redirect-following client).
+    // Roblox may rotate .ROBLOSECURITY in a Set-Cookie header.
+    // Call this parser ONLY on responses from the fixed users.roblox.com,
+    // games.roblox.com, or thumbnails.roblox.com hosts and with redirects
+    // disabled. It does not inspect URLs or authorize arbitrary destinations.
     for header in headers.get_all(SET_COOKIE).iter() {
         let Ok(text) = header.to_str() else { continue };
         let Some(value) = text.split(';').next()
