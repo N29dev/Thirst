@@ -9,7 +9,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",
     "bundle:mac": "bash scripts/prepare_macos_bundle.sh && tauri build --bundles app",
-    "bundle:windows": "tauri build --bundles nsis"
+    "bundle:windows": "tauri build --bundles nsis",
+    "test:flags": "node --experimental-strip-types --test tests/fflags.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
