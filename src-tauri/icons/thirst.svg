@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#202c56"/>
+      <stop offset=".34" stop-color="#241b51"/>
+      <stop offset=".68" stop-color="#231538"/>
+      <stop offset="1" stop-color="#301b50"/>
+    </linearGradient>
+    <radialGradient id="magenta" cx=".96" cy=".06" r="1">
+      <stop offset="0" stop-color="#f33ea6" stop-opacity=".65"/>
+      <stop offset=".72" stop-color="#a833e7" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#612cdd" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blueglow" cx=".07" cy=".97" r=".9">
+      <stop offset="0" stop-color="#5d42ff" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#4842cd" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" x1=".12" y1=".06" x2=".93" y2=".96">
+      <stop offset="0" stop-color="#f9fdff"/>
+      <stop offset=".45" stop-color="#c3c0ff"/>
+      <stop offset="1" stop-color="#e8a9ff"/>
+    </linearGradient>
+    <linearGradient id="liquid" x1=".25" y1="0" x2=".8" y2="1">
+      <stop offset="0" stop-color="#fffbff"/>
+      <stop offset=".38" stop-color="#bbb5ff"/>
+      <stop offset=".8" stop-color="#8661fc"/>
+      <stop offset="1" stop-color="#7661e9"/>
+    </linearGradient>
+    <linearGradient id="dropBody" x1=".22" y1=".02" x2=".84" y2=".97">
+      <stop offset="0" stop-color="#fcfaff"/>
+      <stop offset=".20" stop-color="#c1c5ff"/>
+      <stop offset=".50" stop-color="#6451d0"/>
+      <stop offset="1" stop-color="#4235ae"/>
+    </linearGradient>
+    <linearGradient id="orbit" x1=".09" y1=".85" x2=".94" y2=".24">
+      <stop offset="0" stop-color="#a3baff"/>
+      <stop offset=".34" stop-color="#8b7cff"/>
+      <stop offset=".70" stop-color="#b775ff"/>
+      <stop offset="1" stop-color="#ff7ae6"/>
+    </linearGradient>
+    <clipPath id="tileclip"><rect x="37" y="37" width="950" height="950" rx="210"/></clipPath>
+    <clipPath id="dropletclip">
+      <path d="M512 197 C492 222 340 410 304 516 C259 651 310 778 418 815 C508 847 618 819 689 731 C759 639 727 530 678 444 C638 372 555 241 512 197 Z"/>
+    </clipPath>
+  </defs>
+  <rect x="37" y="37" width="950" height="950" rx="210" fill="#dfdfff"/>
+  <g clip-path="url(#tileclip)">
+    <rect x="46" y="46" width="932" height="932" fill="url(#tile)"/>
+    <rect x="46" y="46" width="932" height="932" fill="url(#magenta)"/>
+    <rect x="46" y="46" width="932" height="932" fill="url(#blueglow)"/>
+    <path d="M40 410 C280 350 340 140 600 37 L37 37 Z" fill="#748ed9" opacity=".13"/>
+    <path d="M410 985 C680 720 865 784 990 695 L990 1000 Z" fill="#c076ed" opacity=".13"/>
+    <g transform="rotate(-19 514 528)">
+      <ellipse cx="520" cy="540" rx="344" ry="114" fill="none" stroke="#7c50fa" stroke-opacity=".25" stroke-width="37"/>
+      <path d="M195 545 A344 114 0 0 0 855 545" fill="none" stroke="url(#orbit)" stroke-width="30" stroke-linecap="round"/>
+    </g>
+    <path d="M512 197 C492 222 340 410 304 516 C259 651 310 778 418 815 C508 847 618 819 689 731 C759 639 727 530 678 444 C638 372 555 241 512 197 Z" fill="url(#dropBody)" stroke="#dfdcff" stroke-width="23" stroke-linejoin="round"/>
+    <g clip-path="url(#dropletclip)">
+      <path d="M260 607 C350 565 400 675 493 624 C590 566 638 514 749 568 L749 848 L270 848 Z" fill="url(#liquid)" opacity=".95"/>
+      <path d="M288 606 C394 568 398 678 514 616 C606 566 673 537 744 572" stroke="#fff4ff" stroke-opacity=".78" fill="none" stroke-width="15"/>
+      <path d="M343 745 C470 833 612 781 675 716" fill="none" stroke="#c6b6ff" stroke-width="17" stroke-opacity=".42"/>
+      <path d="M468 274 C425 346 386 405 367 449" fill="none" stroke="#fff" stroke-width="18" stroke-opacity=".36" stroke-linecap="round"/>
+    </g>
+    <g transform="rotate(-19 514 528)">
+      <path d="M180 542 A344 114 0 0 0 860 542" fill="none" stroke="url(#orbit)" stroke-width="26" stroke-linecap="round"/>
+      <path d="M715 463 A344 114 0 0 1 860 542" fill="none" stroke="#ffe5ff" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
+    </g>
+    <path d="M463 374 l45 -59" stroke="#fffaff" stroke-width="33" stroke-linecap="round" opacity=".88"/>
+    <path d="M150 110 C218 71 319 74 402 75" stroke="#ffffff" stroke-width="15" stroke-opacity=".26" fill="none" stroke-linecap="round"/>
+  </g>
+  <rect x="45" y="45" width="934" height="934" rx="203" fill="none" stroke="url(#rim)" stroke-width="23"/>
+  <rect x="62" y="62" width="900" height="900" rx="188" fill="none" stroke="#fdfbff" stroke-opacity=".25" stroke-width="4"/>
+</svg>
