@@ -27,6 +27,7 @@ This document tracks features requested during the first successful macOS alpha 
 - [x] macOS Keychain and Windows Credential Manager handling in native Rust/OS code only (implementation; real-device testing ongoing).
 - [x] Strict allowlist for the initial authenticated Roblox verification endpoint, no third-party cookie transfers, no cookie in Svelte or plugins.
 - [x] Opt-in connected account profile and local sign-out. Roblox server-side session revocation remains a manual Roblox Settings action.
+- [ ] Optional macOS **Touch ID / user-presence protection** for saved Roblox sessions using `LocalAuthentication` and `SecAccessControl`, with password fallback. Design and test a safe migration from the existing Keychain entry, keep the secret native-only, and never claim this suppresses macOS's separate application-access consent dialogs.
 - [ ] Security threat model, tests, and independent review prior to public beta.
 
 ## Alpha 0.4 — Advanced server tools
