@@ -1,5 +1,6 @@
 import type { PublicServer } from "./types";
-import type { LocalRegionReport, RegionFilter } from "./regions";
+import { providerBroadRegion } from "./regions";
+import type { LocalRegionReport, ProviderRegion, RegionFilter } from "./regions";
 
 export type ServerSort = "default" | "lowest-ping" | "most-players" | "fewest-players" | "most-slots";
 export type ServerFilters = {
@@ -22,7 +23,8 @@ export function filterAndSortServers(
   servers: PublicServer[],
   filters: ServerFilters,
   regionReports: LocalRegionReport[] = [],
-  placeId: number | null = null
+  placeId: number | null = null,
+  providerRegions: Record<string, ProviderRegion> = {}
 ): PublicServer[] {
   const query = filters.search.trim().toLowerCase();
   const matches = servers.filter(server => {
@@ -31,12 +33,13 @@ export function filterAndSortServers(
       server.ping > filters.maxPing)) return false;
     if (query && !server.id.toLowerCase().includes(query)) return false;
     if (filters.region !== "any") {
-      const region = placeId === null ? null : regionReports.find(entry =>
+      const local = placeId === null ? null : regionReports.find(entry =>
         entry.placeId === placeId && entry.serverId === server.id.toLowerCase() &&
         Date.now() >= entry.observedAt && Date.now() - entry.observedAt < 2 * 60 * 60 * 1000
       );
-      if (filters.region === "unknown" && region) return false;
-      if (filters.region !== "unknown" && (!region || region.region !== filters.region)) return false;
+      const resolved = local?.region ?? providerBroadRegion(providerRegions[server.id.toLowerCase()]);
+      if (filters.region === "unknown" && resolved) return false;
+      if (filters.region !== "unknown" && resolved !== filters.region) return false;
     }
     return true;
   });
