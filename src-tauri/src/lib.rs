@@ -18,7 +18,7 @@ struct PublicServer {
     // Anonymous public player tokens never leave native Rust. The webview only
     // receives validated Roblox CDN image URLs when a user requests a preview.
     #[serde(default, skip_serializing)]
-    player_tokens: Vec<String>,
+    player_tokens: Option<Vec<String>>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
