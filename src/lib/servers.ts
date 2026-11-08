@@ -11,11 +11,7 @@ export type ServerFilters = {
   region: RegionFilter;
 };
 
-export const SERVER_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function isValidServerId(value: unknown): value is string {
-  return typeof value === "string" && SERVER_UUID_PATTERN.test(value);
-}
+export { isValidServerId, SERVER_UUID_PATTERN } from "./ids";
 
 // A live Roblox instance is ephemeral. Thirst intentionally does not persist
 // favorite server UUIDs; bookmarks are better attached to games/subplaces.

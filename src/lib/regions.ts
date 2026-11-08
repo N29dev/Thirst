@@ -1,4 +1,4 @@
-import { isValidServerId } from "./servers";
+import { isValidServerId } from "./ids";
 
 // This is NOT automatic geolocation and is never uploaded. Users can annotate
 // a short-lived Roblox instance after checking where it actually hosted.
