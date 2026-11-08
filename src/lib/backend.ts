@@ -79,6 +79,12 @@ export function connectedRobloxAccount(): Promise<ConnectedAccount | null> {
   return invoke<ConnectedAccount | null>("connected_roblox_account");
 }
 
+// Drop the native unlocked memory copy without removing the OS Keychain entry.
+// A later authenticated request may prompt for Keychain access again.
+export function lockRobloxSession(): Promise<void> {
+  return invoke<void>("lock_roblox_session");
+}
+
 export function disconnectRobloxAccount(): Promise<void> {
   return invoke<void>("disconnect_roblox_account");
 }

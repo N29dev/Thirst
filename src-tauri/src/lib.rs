@@ -335,6 +335,7 @@ pub fn run() {
             auth::reload_roblox_login,
             auth::finish_roblox_login,
             auth::connected_roblox_account,
+            auth::lock_roblox_session,
             auth::disconnect_roblox_account,
             auth::cancel_roblox_login
         ])
