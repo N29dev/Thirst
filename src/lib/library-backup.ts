@@ -37,7 +37,7 @@ export function importLibraryJson(json:string):SavedGame[] {
     }));
     output.push({
       placeId,name:game.name,
-      addedAt:Number.isFinite(game.addedAt) && game.addedAt!>0 ? game.addedAt! : Date.now(),
+      addedAt:typeof game.addedAt === "number" && Number.isFinite(game.addedAt) && game.addedAt > 0 ? game.addedAt : Date.now(),
       subplaces,
       universeId:validPlaceId(game.universeId??0) ? game.universeId:undefined,
       rootPlaceId:validPlaceId(game.rootPlaceId??0)?game.rootPlaceId:undefined,
