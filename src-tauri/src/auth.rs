@@ -108,9 +108,13 @@ fn stop_native_helper(state: &AuthState) -> Result<(), String> {
 
 #[cfg(target_os = "macos")]
 fn native_helper_path(app: &AppHandle) -> PathBuf {
+    // During development always run the Swift helper compiled for this Cargo
+    // build. A previously packaged resource must never shadow new source.
+    if cfg!(debug_assertions) {
+        return PathBuf::from(MACOS_HELPER);
+    }
     // In an installed .app the Swift login helper is part of the app bundle.
-    // Cargo builds use OUT_DIR instead. Both derive from Thirst's own build,
-    // never from a path supplied by the Svelte UI.
+    // Both paths derive from Thirst's own build, not from Svelte input.
     app.path().resource_dir().ok()
         .map(|base| base.join("resources/ThirstLogin"))
         .filter(|path| path.is_file())
