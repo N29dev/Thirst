@@ -265,13 +265,14 @@ pub fn roblox_login_status(state: State<'_, AuthState>) -> Result<&'static str, 
         let Some(child) = lock.as_mut() else { return Ok("not-started") };
         match child.try_wait().map_err(|_| "Could not inspect native login completion.".to_owned())? {
             None => Ok("waiting"),
-            Some(_) => {
-                drop(lock);
-                if read_pending_session()?.is_some() {
-                    Ok("ready")
-                } else {
-                    Ok("cancelled")
-                }
+            Some(exit) => {
+                // A successful helper exit guarantees it wrote a pending
+                // credential to Keychain. Do NOT read that credential just to
+                // poll status: a second executable reading it triggers extra
+                // macOS Keychain approval dialogs. Finish handles the one
+                // necessary read after the user has completed login.
+                *lock = None;
+                Ok(if exit.success() { "ready" } else { "cancelled" })
             }
         }
     }
