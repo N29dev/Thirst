@@ -792,8 +792,10 @@
         recentLaunches = recordRecentLaunch(placeId, recentPlaceName(games,placeId));
         // Label this separately as a launch request. A later Roblox Player
         // log observation replaces a matching request, if one is available.
-        if (historyEnabled()) recordLaunchAttempt(
-          readActivityHistory(), placeId, games, jobId);
+        if (historyEnabled()) {
+          recordLaunchAttempt(readActivityHistory(), placeId, games, jobId);
+          window.dispatchEvent(new Event("thirst:activity-updated"));
+        }
       } catch {
         // History never prevents starting Roblox.
       }
