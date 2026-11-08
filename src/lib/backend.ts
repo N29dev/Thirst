@@ -36,6 +36,11 @@ export function openRobloxLogin(acknowledged: boolean): Promise<void> {
   return invoke<void>("open_roblox_login", { acknowledged });
 }
 
+// Reloads only the already-open, origin-restricted native Roblox webview.
+export function reloadRobloxLogin(): Promise<void> {
+  return invoke<void>("reload_roblox_login");
+}
+
 export function finishRobloxLogin(): Promise<ConnectedAccount> {
   return invoke<ConnectedAccount>("finish_roblox_login");
 }
