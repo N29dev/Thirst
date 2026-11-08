@@ -24,8 +24,10 @@
 <div class="game-art" class:ready={loaded} class:missing={!safeUrl || failed} class:cover={variant === "cover"} class:tile={variant === "tile"} class:hero={variant === "hero"} aria-hidden="true">
   <div class="art-fallback"><span>{fallback}</span></div>
   {#if safeUrl && !failed}
-    <img src={safeUrl} alt="" loading={eager ? "eager" : "lazy"} decoding="async"
-      onload={() => { loaded = true; }} onerror={() => { failed = true; loaded = false; }} />
+    {#key safeUrl}
+      <img src={safeUrl} alt="" loading={eager ? "eager" : "lazy"} decoding="async"
+        onload={() => { loaded = true; }} onerror={() => { failed = true; loaded = false; }} />
+    {/key}
   {/if}
   <span class="art-sheen"></span>
 </div>
@@ -40,9 +42,10 @@
   .art-fallback span{font-size:clamp(28px,5vw,72px);font-weight:850;line-height:1;letter-spacing:-4px;opacity:.42}
   .tile .art-fallback span{font-size:27px;letter-spacing:-2px;opacity:.75}
   .hero .art-fallback span{font-size:78px}
-  img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
-    opacity:0;transform:scale(1.055);transition:opacity .3s ease,transform .45s cubic-bezier(.2,.75,.2,1)}
-  .ready img{opacity:1;transform:scale(1)}
+  img{position:absolute;inset:0;display:block;width:100%;height:100%;
+    object-fit:contain;object-position:center;background:#163249;
+    opacity:0;transform:none;transition:opacity .18s ease}
+  .ready img{opacity:1}
   .art-sheen{position:absolute;inset:0;pointer-events:none;background:linear-gradient(160deg,#fff8 0%,transparent 32%,#050d1a2b 100%);opacity:.14}
   .cover .art-sheen{opacity:.30}
   .hero .art-sheen{opacity:.2}
