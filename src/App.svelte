@@ -1013,7 +1013,18 @@
             </select>
             <button class="btn primary" disabled={!activePlaceId || loading} onclick={() => loadServers(false)}>{loading ? "Loading…" : "↻ Refresh"}</button>
           </div>
-          <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Roblox does not provide verified server regions here. You can mark a region after checking it in-game: these labels stay on your device, are not shared, and expire after two hours. Connected users see automatic anonymous avatar previews for up to eight loaded servers (unless disabled or in Lite Mode).</div>
+          <div class="rovalra-toolbar">
+            <label class="server-checkbox" title="Experimental source; opt in once per Thirst run. No Roblox cookie is shared.">
+              <input type="checkbox" checked={rovalraEnabled} onchange={e => setRoValraEnabled(e.currentTarget.checked)} />
+              Use RoValra regions (temporary)
+            </label>
+            <button class="btn secondary small" disabled={!rovalraEnabled || rovalraLoading || !servers.length} onclick={loadRoValraRegions}>
+              {rovalraLoading ? "Finding regions…" : "↻ Look up regions"}
+            </button>
+            <span class="provider-note">Only public place/server IDs are sent to RoValra. No Roblox session cookie. 30-second lookup cooldown.</span>
+            <a class="provider-credit" href="https://www.rovalra.com/" target="_blank" rel="noopener noreferrer">Region data by RoValra ↗</a>
+          </div>
+          <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Regions are Unknown until you add a local observation or explicitly opt into RoValra's third-party region data. RoValra results are provider-reported, not independently verified by Thirst; local observations expire after two hours. Connected users can see automatic anonymous avatar previews for up to eight loaded servers (unless disabled or in Lite Mode).</div>
           <div class="server-filter-bar">
             <label for="server-sort">Sort
               <select id="server-sort" class="input" bind:value={serverSort}>
@@ -1034,7 +1045,7 @@
                 <option value="300">≤ 300 ms</option>
               </select>
             </label>
-            <label for="server-region">Region · local reports
+            <label for="server-region">Region · available sources
               <select id="server-region" class="input" bind:value={regionFilter}>
                 <option value="any">All regions</option>
                 <option value="unknown">Unknown only</option>
@@ -1050,9 +1061,10 @@
             
           </div>
           <div class="server-result-note">
-            <span>{visibleServers.length} shown / {servers.length} loaded · {servers.filter(server => !!regionReportFor(server.id)).length} local region reports · No verified provider</span>
+            <span>{visibleServers.length} shown / {servers.length} loaded · {servers.filter(server => !!regionReportFor(server.id)).length} local reports · {Object.keys(providerRegions).length} RoValra results</span>
             <button class="link-button" onclick={() => { serverSort = "default"; serverMaxPing = "any"; serverHideFull = false; serverSearch = ""; regionFilter = "any"; }}>Clear filters</button>
             {#if serverLoadError}<span class="server-error">Last request failed: {serverLoadError}</span>{/if}
+            {#if rovalraError}<span class="server-error">RoValra: {rovalraError}</span>{/if}
             {#if bulkPreviewError}<span class="preview-error">Avatar preview issue: {bulkPreviewError}</span>{/if}
           </div>
           <div class="table-head"><span>SERVER</span><span>REGION</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
@@ -1062,11 +1074,12 @@
               <button
                 class="server-region-button"
                 class:reported={!!regionReportFor(server.id)}
-                title={regionReportFor(server.id) ? "Your unverified local report · expires after two hours · click to edit" : "Region unknown · click to add your own report after checking in-game"}
+                class:provider={!regionReportFor(server.id) && !!providerRegions[server.id.toLowerCase()]}
+                title={regionReportFor(server.id) ? "Your unverified local report · expires after two hours · click to edit" : providerRegions[server.id.toLowerCase()] ? "RoValra-provided region · not independently verified · click to add your own observation" : "Region unknown · click to add your own report after checking in-game"}
                 aria-label={"Region for server " + server.id + ": " + displayServerRegion(server.id) + ". Edit local report."}
                 onclick={() => editServerRegion(server.id)}
               >
-                {#if regionReportFor(server.id)}<span class="region-source-marker">●</span>{/if}
+                {#if regionReportFor(server.id)}<span class="region-source-marker">●</span>{:else if providerRegions[server.id.toLowerCase()]}<span class="region-source-marker provider-marker">◈</span>{/if}
                 {displayServerRegion(server.id)}
               </button>
               <span><strong>{server.playing}</strong><span class="muted"> / {server.maxPlayers}</span></span>
