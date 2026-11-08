@@ -19,7 +19,9 @@ This document tracks features requested during the first successful macOS alpha 
 - [x] Soft pointer-following light/hover effect on actionable cards using requestAnimationFrame, honoring reduced-motion and Lite Mode settings.
 - [x] Let users **pin individual subplaces as standalone quick-launch tiles** on Overview, alongside experiences (e.g. BLR 8v8 / Pro / Customs), with direct launch and server browser shortcuts. Pins persist locally.
 - [x] Sort the My Library experience list by saved order, name A–Z, newest and oldest, with a local-only preference. The Overview shortcut order remains unchanged.
-- [ ] Custom manual reordering of games and pinned subplaces. Recently joined servers are deliberately not bookmarked because instances are ephemeral.
+- [x] Recently opened place shortcuts (not short-lived server UUIDs), with clearable local history.
+- [x] Portable JSON backup of saved games and pinned subplaces; validated merge that preserves existing bookmarks.
+- [ ] Optional manual reordering of games and pinned subplaces.
 - [ ] Toast notifications have accessible dismissal and auto-hide; verify no overlap with game launch.
 
 ## Alpha 0.3 — Account and consent
@@ -49,8 +51,8 @@ This document tracks features requested during the first successful macOS alpha 
 
 ## Alpha 0.5+ — Wider feature parity
 
-- [ ] Supported FastFlags and graphics presets.
-- [ ] Discord Rich Presence, themes, installation and update management.
+- [x] Roblox Player FFlags loader/editor: published 18-key allowlist, native ClientAppSettings read/write, graphics presets, JSON import/export and first-write backup. Real-device validation remains necessary as Roblox can change behavior.
+- [ ] Optional Discord Rich Presence if local game activity can be confirmed. Avoid a duplicate Roblox installer/updater, plugins, or themes without a real user need.
 - [ ] Multi-instance and multi-account options only when stable and compliant.
 - [ ] Plugin API with narrowly scoped permissions and no credential access.
 - [ ] Cross-platform packaging, startup/idle CPU+RAM benchmarks, and signed releases.
