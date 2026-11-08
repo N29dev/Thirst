@@ -14,7 +14,34 @@ Open **Fast Flags** in the sidebar. Thirst reads the current settings file from 
 }
 ~~~
 
-Review the draft, click **Save to Roblox**, and fully restart Roblox. The editor can also copy or export your draft, remove individual flags, and reset only supported keys. Unsupported imported entries are skipped. Other unrelated entries already in the installed file are left untouched.
+Review the draft, click **Save to Roblox**, and fully restart Roblox. Nothing is written to Roblox just from importing a preset. The editor can copy/export your draft, enable or disable individual imported flags, and preserve other unrelated entries already in the installed file. Unsupported or invalid imported entries are skipped.
+
+### Import a named preset
+
+Thirst accepts both raw Roblox `ClientAppSettings.json` objects and named presets that include a `flags` array, as in this example:
+
+~~~json
+{
+  "name": "Example GK profile",
+  "flags": [
+    {"flag": "DFIntTextureQualityOverride", "value": "1", "enabled": true},
+    {"flag": "DFFlagDisableDPIScale", "value": "True", "enabled": false}
+  ],
+  "type": "default",
+  "games": []
+}
+~~~
+
+Choose **Import preset** or drag the file onto the drop zone. By default this **replaces the current unsaved draft**; you may choose **Merge** to retain other active flags. Disabled items are shown separately and **are not written** to Roblox. Their values are retained for named-preset exports. Per-game presets in `games` are not applied or exported by Thirst.
+
+### Export
+
+Choose one of two formats:
+
+- **Named preset:** creates a shareable `your-preset-name.json` in the same `name`, `flags`, `enabled`, `type`, `games` structure. Enabled and disabled supported flags round-trip.
+- **Roblox settings:** creates `ClientAppSettings.json` with only enabled, allowlisted flags. There is no preset metadata or disabled flags.
+
+**Copy** puts the selected export format on the clipboard. Exporting does not include Roblox cookies, account sessions or other private credentials.
 
 ## Install paths
 
