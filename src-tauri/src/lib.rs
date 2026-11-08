@@ -3,6 +3,7 @@
 
 mod auth;
 mod activity;
+mod updates;
 mod server_previews;
 mod rovalra;
 mod fastflags;
@@ -325,6 +326,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             launch_place,
             activity::recent_player_sessions,
+            updates::check_thirst_update,
+            updates::open_thirst_releases,
             list_public_servers,
             rovalra::lookup_rovalra_regions,
             server_previews::server_avatar_preview,
