@@ -520,6 +520,16 @@
     bulkPreviewError = "";
   }
 
+  async function copyServerId(serverId: string) {
+    if (!isValidServerId(serverId)) return;
+    try {
+      await navigator.clipboard.writeText(serverId);
+      notice("Roblox server ID copied to clipboard.");
+    } catch {
+      notice("Clipboard access is unavailable. Hover the ID to see it in full.", "bad");
+    }
+  }
+
   function regionReportFor(serverId: string): LocalRegionReport | null {
     return reportForServer(regionReports, activePlaceId, serverId);
   }
@@ -806,7 +816,7 @@
         <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>Your workspace</h2></div></div>
         <div class="feature-grid">
           <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "library"}><div class="feature-symbol">▦</div><h3>Game library</h3><p>Save experiences and individual subplaces. No account required.</p><span class="feature-link">Explore library ↗</span></button>
-          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={enterServerBrowser}><div class="feature-symbol">◎</div><h3>Public servers</h3><p>Browse server population, FPS and Roblox-reported latency.</p><span class="feature-link">Browse servers ↗</span></button>
+          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={enterServerBrowser}><div class="feature-symbol">◎</div><h3>Public servers</h3><p>Browse server population, temporary regions and Roblox-reported ping.</p><span class="feature-link">Browse servers ↗</span></button>
           <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "settings"}><div class="feature-symbol">⚙</div><h3>Personalize</h3><p>Switch to Lite Mode and keep resource usage predictable.</p><span class="feature-link">Your settings ↗</span></button>
         </div>
       {:else if tab === "library"}
@@ -907,7 +917,7 @@
           </div>
         </div>
       {:else if tab === "servers"}
-        <div class="page-title"><div><span class="eyebrow">LIVE DISCOVERY</span><h1>Public servers</h1><p>Public Roblox server data, requested only when you refresh.</p></div></div>
+        <div class="page-title"><div><span class="eyebrow">LIVE DISCOVERY</span><h1>Public servers</h1><p>Public Roblox server data, requested only when you refresh.</p></div><span class="chip">{useAuthenticatedAvatarRequests && connectedAccount ? "SESSION-BACKED REQUESTS" : "PUBLIC REQUESTS"}</span></div>
         <div class="panel server-panel">
           <div class="server-toolbar">
             <label for="server-game">Experience</label>
@@ -966,7 +976,7 @@
           <div class="table-head"><span>SERVER</span><span>REGION</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
           {#each visibleServers as server (server.id)}
             <div class="server-row">
-              <span class="server-id"><span class="online-dot"></span><span title={server.id}>{server.id.slice(0, 8)}…</span></span>
+              <span class="server-id"><span class="online-dot"></span><button class="server-id-copy" title={"Copy server ID: " + server.id} aria-label={"Copy server ID " + server.id} onclick={() => copyServerId(server.id)}>{server.id.slice(0, 8)}… <span aria-hidden="true">⧉</span></button></span>
               <button
                 class="server-region-button"
                 class:reported={!!regionReportFor(server.id)}
