@@ -72,6 +72,8 @@ struct Request {
 #[serde(rename_all = "camelCase")]
 struct ResultItem {
     #[serde(default)]
+    request_id: Option<String>,
+    #[serde(default)]
     image_url: Option<String>,
     #[serde(default)]
     state: Option<String>,
@@ -125,6 +127,83 @@ pub async fn server_avatar_preview(
         if item.state.as_deref() != Some("Completed") { return None; }
         item.image_url.filter(|value| value.len() <= 1200 && trusted_icon_url(value))
     }).take(MAX_PREVIEW_AVATARS).collect())
+}
+
+/// One bounded batch for the initial eight visible servers. No session cookie
+/// is used. This is invoked only when a signed-in user opens/refreshes servers
+/// with automatic previews enabled. Anonymous tokens never leave native Rust.
+#[tauri::command]
+pub async fn server_avatar_previews(
+    place_id: u64,
+    server_ids: Vec<String>,
+    cache: State<'_, PreviewCache>,
+) -> Result<HashMap<String, Vec<String>>, String> {
+    validate_place_id(place_id)?;
+    if server_ids.is_empty() || server_ids.len() > 8 {
+        return Err("Choose between one and eight loaded servers for avatar previews.".into());
+    }
+
+    let mut requests = Vec::<Request>::new();
+    // A single token might occur in multiple places; map the opaque request ID
+    // to all corresponding public server UUIDs, without returning that ID to JS.
+    let mut request_owners: HashMap<String, Vec<String>> = HashMap::new();
+    let mut output: HashMap<String, Vec<String>> = HashMap::new();
+    for id in server_ids {
+        let uuid = uuid::Uuid::parse_str(&id)
+            .map_err(|_| "Invalid server ID in avatar preview request.".to_owned())?
+            .to_string();
+        if output.contains_key(&uuid) { continue; }
+        output.insert(uuid.clone(), Vec::new());
+        for token in cache.get(place_id, &uuid)? {
+            let request_id = format!("0:{token}:AvatarHeadshot:150x150:png:regular");
+            request_owners.entry(request_id.clone()).or_default().push(uuid.clone());
+            if !requests.iter().any(|item| item.request_id == request_id) {
+                requests.push(Request {
+                    request_id,
+                    token,
+                    target_id: 0,
+                    thumbnail_type: "AvatarHeadShot",
+                    size: "150x150",
+                    format: "png",
+                    is_circular: false,
+                });
+            }
+        }
+    }
+    if requests.is_empty() {
+        // Absence is normal: Roblox may omit public playerTokens.
+        return Ok(output);
+    }
+
+    let client = public_client()?;
+    let response = client.post("https://thumbnails.roblox.com/v1/batch")
+        .json(&requests)
+        .send().await
+        .map_err(|_| "Roblox avatar previews could not be reached.".to_owned())?;
+    if response.status().as_u16() == 429 {
+        return Err("Roblox rate-limited avatar previews.".into());
+    }
+    if !response.status().is_success() {
+        return Err(format!("Roblox avatar previews unavailable (HTTP {}).", response.status().as_u16()));
+    }
+
+    let results = response.json::<Batch>().await
+        .map_err(|_| "Unexpected Roblox avatar thumbnail response.".to_owned())?;
+    for item in results.data.into_iter().take(40) {
+        if item.state.as_deref() != Some("Completed") { continue; }
+        let Some(request_id) = item.request_id else { continue };
+        let Some(owners) = request_owners.get(&request_id) else { continue };
+        let Some(url) = item.image_url else { continue };
+        if url.len() > 1200 || !trusted_icon_url(&url) { continue; }
+        for id in owners {
+            if let Some(images) = output.get_mut(id) {
+                if images.len() < MAX_PREVIEW_AVATARS && !images.contains(&url) {
+                    images.push(url.clone());
+                }
+            }
+        }
+    }
+    Ok(output)
 }
 
 #[cfg(test)]
