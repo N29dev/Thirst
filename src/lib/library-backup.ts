@@ -62,9 +62,17 @@ export function mergeImportedLibrary(existing:SavedGame[],incoming:SavedGame[]):
     // Merging preserves existing custom names and choices. New subplaces and
     // pins from backups can be added without deleting anything from this PC.
     const saved=result[index];
-    const seen=new Set(saved.subplaces.map(p=>p.placeId));
-    const added=game.subplaces.filter(p=>!seen.has(p.placeId)).slice(0,Math.max(0,100-saved.subplaces.length));
-    result[index]={...saved,subplaces:[...saved.subplaces,...added]};
+    const archivedPins=new Set(game.subplaces.filter(p=>p.pinned).map(p=>p.placeId));
+    // Existing custom subplace names are retained, but archived pins are
+    // restored for matching places instead of silently being discarded.
+    const current=saved.subplaces.map(p=>({
+      ...p,
+      pinned:p.pinned===true || archivedPins.has(p.placeId)
+    }));
+    const seen=new Set(current.map(p=>p.placeId));
+    const added=game.subplaces.filter(p=>!seen.has(p.placeId))
+      .slice(0,Math.max(0,100-current.length));
+    result[index]={...saved,subplaces:[...current,...added]};
   }
   return result;
 }
