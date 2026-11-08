@@ -153,3 +153,9 @@ main{min-width:0;min-height:100vh;display:flex;flex-direction:column}.topbar{hei
 .region-editor-actions .btn{padding:8px 10px}
 .server-region-button:focus-visible{outline:2px solid #8ae6f2;outline-offset:2px}
 @media(max-width:760px){.server-region-editor{padding:12px;min-width:570px}.server-region-editor select{min-width:120px}.server-region-button{font-size:10px}}
+
+/* Server IDs are safe to share and convenient to copy for joining friends. */
+.server-id-copy{min-width:0;border:0;background:transparent;padding:5px 0;color:inherit;font:inherit;letter-spacing:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.server-id-copy:hover{color:#9ceaf2}
+.server-id-copy span{color:#729db3;font-size:12px}
+.server-id-copy:focus-visible{outline:2px solid #8ae6f2;outline-offset:2px;border-radius:4px}
