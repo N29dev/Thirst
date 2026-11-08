@@ -16,8 +16,8 @@ This document tracks features requested during the first successful macOS alpha 
 - [x] Compact favorite-game icon grid on Overview, with launch and server buttons.
 - [x] Retrieve official Roblox game names/icons when saving, store the validated CDN icon URL locally; existing bookmarks support explicit metadata refresh (no background polling).
 - [x] On-demand public subplace discovery with paging and a Save action; manual IDs remain available as a fallback.
-- [ ] Soft pointer-following light/hover effect on actionable cards, using CSS-only or requestAnimationFrame and honoring reduced-motion and Lite Mode settings.
-- [ ] Let users **favorite/pin individual subplaces as standalone quick-launch tiles** on Overview, alongside regular experiences (for example BLR 8v8 / Pro / Customs). Each tile should launch directly into its place, with a separate server-browser shortcut; avoid making users navigate into the parent experience.
+- [x] Soft pointer-following light/hover effect on actionable cards using requestAnimationFrame, honoring reduced-motion and Lite Mode settings.
+- [x] Let users **pin individual subplaces as standalone quick-launch tiles** on Overview, alongside experiences (e.g. BLR 8v8 / Pro / Customs), with direct launch and server browser shortcuts. Pins persist locally.
 - [ ] Sort saved games, recent games, pinned subplaces and recent server joins.
 - [ ] Toast notifications have accessible dismissal and auto-hide; verify no overlap with game launch.
 

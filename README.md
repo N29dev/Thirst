@@ -8,10 +8,10 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 
 ## What works now
 
-- Dark desktop interface with a low-overhead Lite Mode.
+- Dark desktop interface with a low-overhead Lite Mode and subtle cursor-following lighting on cards; effects pause when idle and are disabled with Lite Mode or reduced motion.
 - Save favorite Roblox experiences using place IDs or official game URLs. Thirst retrieves their public names and icons on demand, with manual-name fallback.
 - Save and launch individual subplaces under an experience, or discover publicly listed places on demand (with pagination).
-- Quickly launch your 12 first saved games from the Overview icon grid; your game cover is shown where available.
+- Quickly launch saved experiences **and individually pinned subplaces** directly from the Overview grid (up to 24 tiles). Use the star next to a saved subplace to pin/unpin it; the tile's server button goes straight to that subplace's public servers.
 - Fetch public Roblox servers on demand with player counts, Roblox-reported ping and FPS, pagination, and instance-specific launch links.
 - Launch Roblox using its registered desktop deep-link protocol on macOS or Windows.
 - Keep bookmarks and preferences locally. No Thirst account, telemetry, or background polling.
