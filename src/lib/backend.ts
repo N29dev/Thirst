@@ -41,6 +41,11 @@ export function reloadRobloxLogin(): Promise<void> {
   return invoke<void>("reload_roblox_login");
 }
 
+// Only a status string; the actual cookie never crosses IPC.
+export function pollRobloxLoginStatus(): Promise<"waiting" | "ready" | "cancelled" | "not-started" | "manual"> {
+  return invoke("roblox_login_status");
+}
+
 export function finishRobloxLogin(): Promise<ConnectedAccount> {
   return invoke<ConnectedAccount>("finish_roblox_login");
 }
