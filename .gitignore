@@ -8,3 +8,6 @@ src-tauri/gen/schemas/
 .env.*
 !.env.example
 *.log
+# macOS generated helper and icon (created before packaging)
+src-tauri/resources/ThirstLogin
+src-tauri/icons/icon.icns

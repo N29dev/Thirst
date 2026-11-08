@@ -6,6 +6,8 @@ use std::sync::{Mutex, OnceLock};
 use zeroize::Zeroizing;
 #[cfg(target_os = "macos")]
 use std::process::{Child, Command, Stdio};
+#[cfg(target_os = "macos")]
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use reqwest::header::{COOKIE, SET_COOKIE};
@@ -105,7 +107,18 @@ fn stop_native_helper(state: &AuthState) -> Result<(), String> {
 }
 
 #[cfg(target_os = "macos")]
-fn start_native_helper(state: &AuthState) -> Result<(), String> {
+fn native_helper_path(app: &AppHandle) -> PathBuf {
+    // In an installed .app the Swift login helper is part of the app bundle.
+    // Cargo builds use OUT_DIR instead. Both derive from Thirst's own build,
+    // never from a path supplied by the Svelte UI.
+    app.path().resource_dir().ok()
+        .map(|base| base.join("resources/ThirstLogin"))
+        .filter(|path| path.is_file())
+        .unwrap_or_else(|| PathBuf::from(MACOS_HELPER))
+}
+
+#[cfg(target_os = "macos")]
+fn start_native_helper(state: &AuthState, app: &AppHandle) -> Result<(), String> {
     let mut helper = state.helper.lock()
         .map_err(|_| "Native login state could not be accessed.".to_owned())?;
     if let Some(child) = helper.as_mut() {
@@ -116,7 +129,7 @@ fn start_native_helper(state: &AuthState) -> Result<(), String> {
     // Clear only the pending session. Never replace a stored account until
     // verify_cookie succeeds in finish_roblox_login.
     delete_pending_session()?;
-    let child = Command::new(MACOS_HELPER)
+    let child = Command::new(native_helper_path(app))
         .arg(std::process::id().to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -331,8 +344,7 @@ pub async fn open_roblox_login(
     {
         // Use AppleBlox-style native WKWebView on macOS instead of Tauri's
         // in-app webview, which is not rendering Roblox login reliably.
-        let _ = app;
-        return start_native_helper(&state);
+        return start_native_helper(&state, &app);
     }
 
     #[cfg(not(target_os = "macos"))]

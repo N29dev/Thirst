@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "bundle:mac": "bash scripts/prepare_macos_bundle.sh && tauri build --bundles app",
+    "bundle:windows": "tauri build --bundles nsis"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
