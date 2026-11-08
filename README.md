@@ -10,6 +10,7 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 
 - Dark desktop interface with a low-overhead Lite Mode and subtle cursor-following lighting on cards; effects pause when idle and are disabled with Lite Mode or reduced motion.
 - Save favorite Roblox experiences using place IDs or official game URLs. Thirst retrieves their public names and icons on demand, with manual-name fallback.
+- Sort the My Library experience list by saved order, name A–Z, newest or oldest. The sort preference is stored locally and never changes how quick-launch tiles are arranged.
 - Save and launch individual subplaces under an experience, or discover publicly listed places on demand (with pagination).
 - Quickly launch saved experiences **and individually pinned subplaces** directly from the Overview grid (up to 24 tiles). Use the star next to a saved subplace to pin/unpin it; the tile's server button goes straight to that subplace's public servers.
 - Fetch public Roblox servers on demand with player counts, Roblox-reported ping, pagination, and instance-specific launch links. Server FPS is deliberately omitted from the browser because it does not predict a player's game FPS.
