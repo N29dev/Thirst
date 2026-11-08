@@ -366,6 +366,8 @@ pub async fn connected_roblox_account() -> Result<Option<ConnectedAccount>, Stri
 
 #[tauri::command]
 pub async fn disconnect_roblox_account(app: AppHandle, state: State<'_, AuthState>) -> Result<(), String> {
+    #[cfg(not(target_os = "macos"))]
+    let _ = &state;
     #[cfg(target_os = "macos")]
     {
         stop_native_helper(&state)?;
@@ -383,6 +385,8 @@ pub async fn disconnect_roblox_account(app: AppHandle, state: State<'_, AuthStat
 
 #[tauri::command]
 pub async fn cancel_roblox_login(app: AppHandle, state: State<'_, AuthState>) -> Result<(), String> {
+    #[cfg(not(target_os = "macos"))]
+    let _ = &state;
     #[cfg(target_os = "macos")]
     {
         stop_native_helper(&state)?;
