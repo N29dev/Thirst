@@ -184,3 +184,22 @@ main{min-width:0;min-height:100vh;display:flex;flex-direction:column}.topbar{hei
 .server-region-button .region-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;letter-spacing:.05px}
 .server-region-button .region-source-marker{flex:none}
 @media(max-width:760px){.server-region-button{gap:6px;padding:8px}.server-region-button .region-name{font-size:10px}.server-region-button .region-flag{font-size:16px}}
+
+/* Recent launches are place-level shortcuts, never persistent Roblox job IDs. */
+.recent-heading{margin-top:29px}
+.recent-launch-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;margin-bottom:32px}
+.recent-launch-item{display:flex;align-items:center;gap:10px;border:1px solid #294254;border-radius:12px;background:#152334;color:#d4eefa;padding:14px 11px;min-width:0;text-align:left}
+.recent-launch-item:hover{background:#203648;border-color:#5b91a8}
+.recent-symbol{width:29px;height:29px;flex:none;border-radius:9px;background:#194158;color:#8ae2ef;display:grid;place-items:center;font-size:12px}
+.recent-label{flex:1;min-width:0}
+.recent-label strong{display:block;font-size:11px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.recent-label small{display:block;color:#869eaf;font-size:9px;margin-top:4px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.recent-go{color:#6ab8cb}
+.library-backup-actions{margin:-10px 0 17px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+.library-backup-actions>span{font-size:11px;color:#869daf}
+.library-backup-actions>div{display:flex;align-items:center;gap:8px}
+.library-import-input{position:absolute;opacity:0;width:1px;height:1px}
+.library-import-label{display:inline-block;cursor:pointer;white-space:nowrap}
+.library-import-input:focus-visible+.library-import-label{outline:2px solid #89e0f0;outline-offset:2px}
+@media(max-width:1200px){.recent-launch-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:800px){.recent-launch-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
