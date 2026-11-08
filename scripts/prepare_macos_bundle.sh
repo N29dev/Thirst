@@ -19,8 +19,10 @@ chmod 755 "$TAURI/resources/ThirstLogin"
 
 # Produce a native macOS icon from the existing Thirst artwork. Generated
 # icons are build outputs, not source images that need to be committed.
-ICONSET="$(mktemp -d "${TMPDIR:-/tmp}/thirst-icons.XXXXXX")"
-trap 'rm -rf "$ICONSET"' EXIT
+ICON_BASE="$(mktemp -d "${TMPDIR:-/tmp}/thirst-icons.XXXXXX")"
+ICONSET="$ICON_BASE/Thirst.iconset"
+mkdir -p "$ICONSET"
+trap 'rm -rf "$ICON_BASE"' EXIT
 ICON="$TAURI/icons/icon.png"
 for spec in "16:icon_16x16.png" "32:icon_16x16@2x.png" \
             "32:icon_32x32.png" "64:icon_32x32@2x.png" \
