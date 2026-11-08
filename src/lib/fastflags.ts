@@ -99,31 +99,118 @@ export function cleanFlagValue(name:string, input:unknown):string {
 }
 
 export type FFlagImportResult = {
-  flags: Record<string,string>;
+  flags: Record<string, string>;
+  disabled: Record<string, string>;
   ignored: string[];
+  invalid: string[];
+  format: "roblox" | "preset";
+  name: string | null;
 };
 
-export function importFFlagsJson(raw:string):FFlagImportResult {
-  if(raw.length>64_000) throw new Error("JSON is too large (64 KB maximum).");
-  let parsed:unknown;
-  try { parsed=JSON.parse(raw); }
-  catch { throw new Error("Not valid JSON. Paste a ClientAppSettings.json object."); }
-  if(!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("Fast Flags JSON must contain one object of flag names and values.");
+type NamedPresetFlag = { flag: unknown; value: unknown; enabled?: unknown };
+
+// Accept Roblox ClientAppSettings.json as well as the named-presets format
+// used by launchers such as Bloxstrap ("name", "flags" array, "type", "games").
+// Only allowlisted Player flags are imported. Never import game overrides,
+// commands, account data or unsupported flags from someone else's preset.
+export function importFFlagsJson(raw: string): FFlagImportResult {
+  if (raw.length > 64_000) throw new Error("JSON is too large (64 KB maximum).");
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); }
+  catch { throw new Error("Invalid JSON. Choose a Roblox settings file or a named Fast Flags preset."); }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Fast Flags JSON must be an object.");
   }
-  const flags:Record<string,string>={};
-  const ignored:string[]=[];
-  for (const [name,value] of Object.entries(parsed)) {
-    if (!flagDefinition(name)) {ignored.push(name);continue;}
-    flags[name]=cleanFlagValue(name,value);
+
+  const document = parsed as Record<string, unknown>;
+  const isPreset = Array.isArray(document.flags);
+  if ("flags" in document && !isPreset) {
+    throw new Error("Preset 'flags' must be an array of {flag, value, enabled} objects.");
   }
-  return {flags,ignored};
+
+  const flags: Record<string, string> = {};
+  const disabled: Record<string, string> = {};
+  const ignored: string[] = [];
+  const invalid: string[] = [];
+  const result: FFlagImportResult = {
+    flags, disabled, ignored, invalid,
+    format: isPreset ? "preset" : "roblox",
+    name: isPreset && typeof document.name === "string"
+      ? document.name.trim().slice(0, 70) || null : null
+  };
+
+  const add = (name: string, value: unknown, enabled: boolean) => {
+    if (!flagDefinition(name)) { ignored.push(name); return; }
+    try {
+      const cleaned = cleanFlagValue(name, value);
+      // An explicitly disabled value must NOT become active on import.
+      if (enabled) {
+        flags[name] = cleaned;
+        delete disabled[name];
+      } else {
+        disabled[name] = cleaned;
+        delete flags[name];
+      }
+    } catch {
+      invalid.push(name);
+    }
+  };
+
+  if (isPreset) {
+    if ((document.flags as unknown[]).length > 512) {
+      throw new Error("Preset has too many entries (512 maximum).");
+    }
+    for (const item of document.flags as unknown[]) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        invalid.push("Invalid entry"); continue;
+      }
+      const entry = item as NamedPresetFlag;
+      if (typeof entry.flag !== "string") {
+        invalid.push("Missing flag name"); continue;
+      }
+      if (entry.enabled !== undefined && typeof entry.enabled !== "boolean") {
+        invalid.push(entry.flag); continue;
+      }
+      add(entry.flag, entry.value, entry.enabled !== false);
+    }
+  } else {
+    for (const [name, value] of Object.entries(document)) add(name, value, true);
+  }
+
+  if (!Object.keys(flags).length && !Object.keys(disabled).length) {
+    throw new Error("No supported Roblox Player flags were found in this JSON.");
+  }
+  return result;
 }
 
-export function exportFFlagsJson(flags:Record<string,string>):string {
-  const data:Record<string,string>={};
-  for(const name of Object.keys(flags).sort()) {
-    data[name]=cleanFlagValue(name,flags[name]);
+export function exportFFlagsJson(flags: Record<string, string>): string {
+  const data: Record<string, string> = {};
+  for (const name of Object.keys(flags).sort()) {
+    data[name] = cleanFlagValue(name, flags[name]);
   }
-  return JSON.stringify(data,null,2);
+  return JSON.stringify(data, null, 2);
+}
+
+export function exportNamedFFlagsJson(
+  enabledFlags: Record<string, string>,
+  disabledFlags: Record<string, string> = {},
+  name = "Thirst preset"
+): string {
+  const cleanName = name.trim().slice(0, 70) || "Thirst preset";
+  const keys = [...new Set([
+    ...Object.keys(enabledFlags), ...Object.keys(disabledFlags)
+  ])].sort();
+  const flags = keys.map(flag => ({
+    flag,
+    value: cleanFlagValue(flag,
+      Object.prototype.hasOwnProperty.call(enabledFlags, flag)
+        ? enabledFlags[flag] : disabledFlags[flag]),
+    enabled: Object.prototype.hasOwnProperty.call(enabledFlags, flag)
+  }));
+  return JSON.stringify({
+    name: cleanName,
+    flags,
+    type: "default",
+    games: []
+  }, null, 2);
 }
