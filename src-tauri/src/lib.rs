@@ -2,6 +2,7 @@
 //! Session credentials are isolated in auth.rs, never returned over Tauri IPC.
 
 mod auth;
+mod server_previews;
 
 use std::time::Duration;
 use tauri_plugin_opener::OpenerExt;
@@ -14,6 +15,10 @@ struct PublicServer {
     max_players: u32,
     #[serde(default)]
     ping: Option<f64>,
+    // Anonymous public player tokens never leave native Rust. The webview only
+    // receives validated Roblox CDN image URLs when a user requests a preview.
+    #[serde(default, skip_serializing)]
+    player_tokens: Vec<String>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -69,6 +74,7 @@ fn platform_name() -> &'static str {
 async fn list_public_servers(
     place_id: u64,
     cursor: Option<String>,
+    previews: tauri::State<'_, server_previews::PreviewCache>,
 ) -> Result<ServerPage, String> {
     validate_place_id(place_id)?;
     // Roblox host is fixed; no caller-controlled host, cookie or redirect.
@@ -108,10 +114,12 @@ async fn list_public_servers(
         ));
     }
 
-    response
+    let page = response
         .json::<ServerPage>()
         .await
-        .map_err(|_| "Roblox returned an unexpected server response.".to_owned())
+        .map_err(|_| "Roblox returned an unexpected server response.".to_owned())?;
+    previews.remember(place_id, &page);
+    Ok(page)
 }
 
 
@@ -296,10 +304,12 @@ async fn discover_subplaces(
 pub fn run() {
     tauri::Builder::default()
         .manage(auth::AuthState::default())
+        .manage(server_previews::PreviewCache::default())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             launch_place,
             list_public_servers,
+            server_previews::server_avatar_preview,
             lookup_game,
             discover_subplaces,
             platform_name,
