@@ -215,8 +215,7 @@ pub async fn server_avatar_previews(
         }
     }
     if requests.is_empty() {
-        // Absence is normal: Roblox may omit public playerTokens.
-        return Ok(output);
+        return Err("Roblox did not include any public playerTokens for these servers. Using a session cookie cannot produce avatars when server tokens are absent.".into());
     }
 
     let results = request_thumbnail_batch(&requests, authenticated).await?;
@@ -234,6 +233,9 @@ pub async fn server_avatar_previews(
             }
         }
     }
+    if output.values().all(Vec::is_empty) {
+        return Err("Roblox returned thumbnail records but no completed public avatar images. Try refreshing or testing another experience.".into());
+    }
     Ok(output)
 }
 
@@ -241,6 +243,24 @@ pub async fn server_avatar_previews(
 mod tests {
     use super::*;
     use crate::PublicServer;
+
+    #[test]
+    fn thumbnail_payload_contains_expected_roblox_fields() {
+        let request = Request {
+            request_id: "0:opaque:AvatarHeadshot:150x150:png:regular".into(),
+            token: "opaque".into(),
+            target_id: 0,
+            thumbnail_type: "AvatarHeadShot",
+            size: "150x150",
+            format: "png",
+            is_circular: false,
+        };
+        let json = serde_json::to_value(&request).expect("serialize thumbnail");
+        assert_eq!(json["targetId"], 0);
+        assert_eq!(json["type"], "AvatarHeadShot");
+        assert_eq!(json["size"], "150x150");
+        assert_eq!(json["format"], "png");
+    }
 
     #[test]
     fn limits_and_expires_anonymous_public_tokens() {
