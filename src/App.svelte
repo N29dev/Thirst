@@ -4,6 +4,8 @@
   import { cubicOut } from "svelte/easing";
   import UiIcon from "./UiIcon.svelte";
   import GameArtwork from "./GameArtwork.svelte";
+  import FavoriteExperience from "./FavoriteExperience.svelte";
+  import LibrarySpotlight from "./LibrarySpotlight.svelte";
   import thirstAppIcon from "../src-tauri/icons/thirst.svg";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
@@ -160,6 +162,14 @@
       iconUrl: game.iconUrl, isSubplace: true
     }))
   ]).slice(0, 24);
+  // Group pinned destinations underneath their parent instead of showing
+  // the same low-resolution icon in a full-sized tile for every subplace.
+  $: quickLaunchGroups = games.map(game => ({
+    game,
+    pinned: game.subplaces.filter(place => quickLaunchItems.some(item =>
+      item.isSubplace && item.parentPlaceId === game.placeId && item.placeId === place.placeId))
+  })).filter(group => quickLaunchItems.some(item =>
+    !item.isSubplace && item.placeId === group.game.placeId));
   $: availablePlaces = selected
     ? [
         { placeId: selected.placeId, name: "Main place" },
@@ -1106,24 +1116,14 @@
         </div>
         {#if quickLaunchItems.length}
           <div class="section-heading favorites-heading"><div><span class="eyebrow">READY TO PLAY</span><h2>Your favorites</h2><p class="section-subcopy">Launch a game or jump straight to its public servers.</p></div><button class="link-button" onclick={() => tab = "library"}>Manage library ↗</button></div>
-          <div class="quick-launch-grid">
-            {#each quickLaunchItems as item (`${item.parentPlaceId}:${item.placeId}`)}
-              <div class="quick-game" class:subplace={item.isSubplace}>
-                <button class="quick-game-main" onclick={() => play(item.placeId)} title={"Launch " + item.name} aria-label={"Launch " + item.name}>
-                  <span class="quick-game-media">
-                    <GameArtwork name={item.name} src={item.iconUrl} variant="cover"/>
-                    <span class="quick-game-kind">{item.isSubplace ? "SUBPLACE" : "EXPERIENCE"}</span>
-                    <span class="quick-game-launch-cue"><UiIcon name="play" size={16}/></span>
-                  </span>
-                  <span class="quick-game-info">
-                    <strong class="quick-game-title">{item.name}</strong>
-                    <small class="quick-game-label" title={item.parentName}>
-                      {item.isSubplace ? item.parentName : "Roblox experience"}
-                    </small>
-                  </span>
-                </button>
-                <button class="quick-game-server" title={"Browse " + item.name + " servers"} aria-label={"Browse " + item.name + " servers"} onclick={() => { selectGame(item.parentPlaceId); goToServers(item.placeId); }}><UiIcon name="server" size={17}/></button>
-              </div>
+          <div class="favorite-collection-grid">
+            {#each quickLaunchGroups as group (group.game.placeId)}
+              <FavoriteExperience game={group.game} pinned={group.pinned}
+                onLaunch={play}
+                onBrowse={(parentPlaceId, placeId) => {
+                  selectGame(parentPlaceId);
+                  goToServers(placeId);
+                }}/>
             {/each}
           </div>
           {#if games.reduce((total, game) => total + 1 + game.subplaces.filter(place => place.pinned).length, 0) > 24}
@@ -1205,17 +1205,8 @@
           <div class="panel detail-panel">
             {#if selected}
               {#key selected.placeId}
-              <div class="game-spotlight" in:fly={{ y: liteMode || reducedMotion ? 0 : 10, duration: liteMode || reducedMotion ? 0 : 190, opacity: 0.8, easing: cubicOut }}>
-                <div class="spotlight-art"><GameArtwork name={selected.name} src={selected.iconUrl} variant="hero" eager /></div>
-                <div class="spotlight-info">
-                  <span class="eyebrow">SAVED EXPERIENCE</span>
-                  <h2 title={selected.name}>{selected.name}</h2>
-                  <p>Place ID {selected.placeId}</p>
-                  <div class="spotlight-tags">
-                    <span>{selected.subplaces.length} {selected.subplaces.length === 1 ? "subplace" : "subplaces"}</span>
-                    <span>{selected.subplaces.filter(place => place.pinned).length} pinned to Quickplay</span>
-                  </div>
-                </div>
+              <div in:fly={{ y: liteMode || reducedMotion ? 0 : 8, duration: liteMode || reducedMotion ? 0 : 170, opacity: .86, easing: cubicOut }}>
+                <LibrarySpotlight game={selected}/>
               </div>
               {/key}
               <div class="detail-actions">
