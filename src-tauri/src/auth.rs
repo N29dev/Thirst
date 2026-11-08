@@ -350,7 +350,11 @@ pub async fn connected_roblox_account() -> Result<Option<ConnectedAccount>, Stri
     let Some(secret) = read_session()? else { return Ok(None) };
     let (account, rotated) = verify_cookie(&secret).await?;
     if let Some(next) = rotated {
-        save_session(&next)?;
+        // Updating an unchanged Keychain item may trigger yet another
+        // authorization dialog on some development builds.
+        if next != secret {
+            save_session(&next)?;
+        }
     }
     Ok(Some(account))
 }
