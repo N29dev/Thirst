@@ -34,7 +34,7 @@ This document tracks features requested during the first successful macOS alpha 
 ## Alpha 0.4 — Advanced server tools
 
 - [x] First region-data foundation: privacy-preserving local reports by place + server UUID, broad-region filters, explicit *your report* badges, two-hour expiry and no external API calls. Default to **Unknown**; reports are unverified, not geolocation or user latency.
-- [x] Temporary, off-by-default **RoValra** API provider with distinct provenance badges, exact-host native requests, a 25-server batch cap, 30-second request cooldown and no Roblox cookie transfer. Results remain in memory. Provider terms must be respected and access can be withdrawn.
+- [x] Temporary **RoValra** API provider enabled on manual server refresh by default, with a remembered opt-out, visible attribution, country flag emoji, compact labels, exact-host native requests, a 25-server batch cap, 30-second cooldown and no Roblox cookie transfer. Results remain in memory. Provider terms must be respected and access can be withdrawn.
 - [ ] Seek explicit permission or a longer-term licensed provider for automatic regions. Do not confuse provider-reported regions with user latency or independently verified datacenter positions.
 - [ ] Clarify use conditions with RoValra before making the temporary region feature a default or promoting it as an alternative to their extension. No scraping or redistribution.
 - [x] On-demand previews of **up to five anonymous player avatars**; connected users receive automatic, one-batch previews for up to eight servers after manual refresh by default. Thirst stores public tokens only in bounded Rust memory and returns validated CDN image URLs, not user IDs. Auto previews are disableable and off in Lite Mode.
@@ -42,7 +42,7 @@ This document tracks features requested during the first successful macOS alpha 
 - [ ] Expand authenticated features for friends/presence and owned private servers only after reviewing their endpoints and privacy permissions.
 - [ ] Opt-in friends-in-server indicator, **only when** authorized presence data is accessible and players' Roblox visibility settings permit it.
 - [x] Filter/sort loaded servers by free slots, player counts, reported ping, local reported regions/Unknown, and job-ID search. Copy a full server UUID by clicking it. No saved server UUIDs: Roblox instances are short-lived; only game/subplace favorites persist.
-- [x] Optional, separately attributed experimental region lookup from RoValra; disabled by default, no cookie forwarding, no scraping. The provider may disallow access. Regions remain Unknown when neither a provider nor a local report returns a value.
+- [x] Separately attributed experimental region lookup from RoValra, enabled by default upon manual server refresh with local opt-out; no cookie forwarding or scraping. The provider may disallow access. Regions remain Unknown when neither a provider nor a local report returns a value.
 - [ ] Confirm long-term provider permission and investigate server version filtering.
 - [x] Basic manual-request cooldown (8 seconds) and extended 429 backoff (45 seconds), bounded 5-minute anonymous-avatar token cache, pagination, and native request timeouts.
 - [ ] Further investigate API response caching, server discovery completeness, and long-running rate-limit behavior before public release.
