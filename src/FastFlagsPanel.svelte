@@ -382,7 +382,7 @@
         <details class="ff-paste-details">
           <summary>Paste JSON instead</summary>
           <textarea id="ff-json" aria-label="Paste Fast Flags JSON" rows="5" class="ff-json-input" bind:value={jsonInput}
-            placeholder='{"name":"My preset","flags":[...]}'></textarea>
+            placeholder="Paste named preset or ClientAppSettings JSON"></textarea>
           <button class="btn secondary small" disabled={!jsonInput.trim()} onclick={() => importJson(jsonInput)}>Import pasted JSON</button>
         </details>
         <div class="ff-transfer-divider"></div>
