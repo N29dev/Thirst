@@ -1209,7 +1209,8 @@
           </div>
           <div class="panel detail-panel">
             {#if selected}
-              <div class="game-spotlight">
+              {#key selected.placeId}
+              <div class="game-spotlight" in:fly={{ y: liteMode || reducedMotion ? 0 : 10, duration: liteMode || reducedMotion ? 0 : 190, opacity: 0.8, easing: cubicOut }}>
                 <div class="spotlight-art"><GameArtwork name={selected.name} src={selected.iconUrl} variant="hero" eager /></div>
                 <div class="spotlight-info">
                   <span class="eyebrow">SAVED EXPERIENCE</span>
@@ -1221,6 +1222,7 @@
                   </div>
                 </div>
               </div>
+              {/key}
               <div class="detail-actions">
                 <button class="btn primary" onclick={() => play(selected.placeId)}><UiIcon name="play" size={16}/> Play experience</button>
                 <button class="btn secondary" onclick={() => goToServers(selected.placeId)}><UiIcon name="server" size={16}/> Browse servers</button>
