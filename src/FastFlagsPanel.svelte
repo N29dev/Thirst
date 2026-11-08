@@ -160,7 +160,9 @@
       const link = document.createElement("a");
       link.href = url;
       link.download = "ClientAppSettings.json";
+      document.body.appendChild(link);
       link.click();
+      link.remove();
       setTimeout(() => URL.revokeObjectURL(url),1000);
       info = "Exported your draft as ClientAppSettings.json.";
       error = "";
