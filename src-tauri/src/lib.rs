@@ -310,6 +310,7 @@ pub fn run() {
             launch_place,
             list_public_servers,
             server_previews::server_avatar_preview,
+            server_previews::server_avatar_previews,
             lookup_game,
             discover_subplaces,
             platform_name,

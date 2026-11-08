@@ -14,6 +14,11 @@ export function fetchServerAvatarPreview(placeId: number, serverId: string): Pro
   return invoke<string[]>("server_avatar_preview", { placeId, serverId });
 }
 
+// One cookie-free request for up to eight servers' anonymous avatar images.
+export function fetchServerAvatarPreviews(placeId: number, serverIds: string[]): Promise<Record<string, string[]>> {
+  return invoke<Record<string, string[]>>("server_avatar_previews", { placeId, serverIds });
+}
+
 export function lookupGame(placeId: number): Promise<GameMetadata> {
   return invoke<GameMetadata>("lookup_game", { placeId });
 }
