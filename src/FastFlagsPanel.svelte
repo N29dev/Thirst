@@ -289,7 +289,7 @@
       <input class="ff-file-input" id="ff-file" type="file" accept=".json,application/json" onchange={importFile}/>
       <label for="ff-file" class="btn secondary ff-upload">↑ Import .json file</label>
       <label class="ff-paste-label" for="ff-json">Paste JSON</label>
-      <textarea id="ff-json" class="ff-json-input" rows="6" placeholder='{"DFIntTextureQualityOverride":"2"}' bind:value={jsonInput}></textarea>
+      <textarea id="ff-json" class="ff-json-input" rows="6" placeholder="Paste ClientAppSettings.json contents…" bind:value={jsonInput}></textarea>
       <div class="ff-actions">
         <button class="btn secondary" disabled={!jsonInput.trim()} onclick={() => importJson(jsonInput)}>Import pasted JSON</button>
         <button class="btn secondary" onclick={copyJson}>Copy JSON</button>
