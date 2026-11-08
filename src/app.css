@@ -582,3 +582,26 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 .lite .tab-scene,.lite .hero-scene-card,.lite .scene-float,
 .lite .skeleton-block{animation:none!important}
 .lite .quick-game,.lite .stat,.lite .feature{transform:none!important}
+
+/* Shared visual identity with the macOS Dock and Windows taskbar icon. */
+.brand .logo {
+  background: none;
+  box-shadow: none;
+  overflow: visible;
+  width: 45px;
+  height: 45px;
+}
+.brand .logo::after { display: none; }
+.brand .logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 11px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.brand:hover .logo {
+  box-shadow: none;
+  transform: translateY(-1px) scale(1.045);
+}
+.lite .brand .logo { background: none; }
