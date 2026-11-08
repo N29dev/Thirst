@@ -54,6 +54,14 @@ Native bundling is currently disabled in `src-tauri/tauri.conf.json`. The macOS 
 | Multi-instance and multi-account support | Research |
 | Signed, tested macOS and Windows releases | Planned |
 
+## macOS Keychain permission prompts
+
+In development, the native Swift login helper and the Rust launcher are separate executables with separate Keychain access permissions. macOS may ask more than once when the helper saves a temporary credential and Thirst verifies and stores it.
+
+Thirst minimizes unnecessary approvals by tracking native login completion through the helper's exit code **without reading Keychain repeatedly**, loading account status once per app session (unless you press **Check status**), and skipping writes when a cookie has not changed. Developer builds may still prompt again after recompilation. Properly signed, stable-identity releases are the long-term solution.
+
+**Never select "Allow all applications to access this item," disable Keychain protections, or change your keychain to remove password prompts.** Check that each prompt names the expected Thirst executable; cancel unfamiliar permission requests. The explicit **Check status** action re-verifies the account and may require Keychain permission.
+
 ## Security
 
 See [docs/SECURITY.md](docs/SECURITY.md) before trying to log in. The experimental native login **does read a Roblox session cookie** from its isolated official-login webview after explicit consent. A stolen cookie can compromise your Roblox account. The credential is stored using OS secure storage but no implementation can guarantee it cannot be stolen. Use a dedicated test account, do not publish or paste any cookie, and revoke testing sessions on Roblox afterwards.
