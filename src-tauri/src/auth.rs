@@ -2,7 +2,8 @@
 //! A Roblox session cookie is effectively a password. Never expose it to
 //! Svelte, the Tauri IPC return value, logs, extensions, or third-party hosts.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
+use zeroize::Zeroizing;
 #[cfg(target_os = "macos")]
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -126,19 +127,86 @@ fn start_native_helper(state: &AuthState) -> Result<(), String> {
     Ok(())
 }
 
+// The Keychain remains the source of truth across app launches. Keep one
+// native-only unlocked copy in process memory to avoid macOS prompting again
+// for every manually requested server list and avatar thumbnail batch.
+//
+// This is intentionally *not* in Tauri State, localStorage, SQLite, IPC or
+// the native login helper. Dropping/replacing the Zeroizing value clears its
+// buffer. The whole cache is destroyed when the application exits.
+static UNLOCKED_SESSION: OnceLock<Mutex<Option<Zeroizing<String>>>> = OnceLock::new();
+
+fn unlocked_session() -> &'static Mutex<Option<Zeroizing<String>>> {
+    UNLOCKED_SESSION.get_or_init(|| Mutex::new(None))
+}
+
+fn load_from_cache_or_keychain<F>(
+    cache: &Mutex<Option<Zeroizing<String>>>,
+    read_keychain: F,
+) -> Result<Option<String>, String>
+where
+    F: FnOnce() -> Result<Option<String>, String>,
+{
+    let mut guard = cache.lock()
+        .map_err(|_| "Could not access the native unlocked session.".to_owned())?;
+    if let Some(secret) = guard.as_ref() {
+        return Ok(Some(secret.as_str().to_owned()));
+    }
+    // Hold the lock across the first Keychain read. Parallel server and
+    // thumbnail requests must not cause two simultaneous approval dialogs.
+    let token = read_keychain()?;
+    if let Some(secret) = token.as_ref() {
+        *guard = Some(Zeroizing::new(secret.clone()));
+    }
+    Ok(token)
+}
+
+fn lock_unlocked_session() -> Result<(), String> {
+    let mut cache = unlocked_session().lock()
+        .map_err(|_| "Could not lock the native session.".to_owned())?;
+    // Zeroizing<String> wipes the previous in-memory secret when dropped.
+    *cache = None;
+    Ok(())
+}
+
+// Rotation from two concurrent requests must not replace a newer cookie with
+// an older response. Update Keychain only if its in-memory value still equals
+// the credential that was sent with this particular HTTP request.
+fn update_session_if_current(original: &str, replacement: &str) -> Result<(), String> {
+    if replacement == original {
+        return Ok(());
+    }
+    let mut cache = unlocked_session().lock()
+        .map_err(|_| "Could not update the native session.".to_owned())?;
+    if cache.as_ref().map(|secret| secret.as_str()) != Some(original) {
+        return Ok(());
+    }
+    keyring_entry()?
+        .set_password(replacement)
+        .map_err(|_| "Could not save a refreshed Roblox session in the OS credential store.".to_owned())?;
+    *cache = Some(Zeroizing::new(replacement.to_owned()));
+    Ok(())
+}
+
 // Errors must never include cookie values, body text or request headers.
 fn save_session(token: &str) -> Result<(), String> {
+    let mut cache = unlocked_session().lock()
+        .map_err(|_| "Could not save the native session.".to_owned())?;
     keyring_entry()?
         .set_password(token)
-        .map_err(|_| "macOS Keychain / Windows Credential Manager could not save the session.".into())
+        .map_err(|_| "macOS Keychain / Windows Credential Manager could not save the session.".to_owned())?;
+    *cache = Some(Zeroizing::new(token.to_owned()));
+    Ok(())
 }
 
 fn read_session() -> Result<Option<String>, String> {
-    match keyring_entry()?.get_password() {
-        Ok(value) => Ok(Some(value)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(_) => Err("Cannot access your saved Roblox session in the OS credential store.".into()),
-    }
+    load_from_cache_or_keychain(unlocked_session(), || {
+        match keyring_entry()?.get_password() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(_) => Err("Cannot access your saved Roblox session in the OS credential store.".into()),
+        }
+    })
 }
 
 /// An explicitly enabled avatar-preview experiment can read the saved cookie
@@ -161,18 +229,20 @@ pub(crate) fn rotate_thumbnail_session(
     headers: &reqwest::header::HeaderMap,
 ) -> Result<(), String> {
     if let Some(next) = rotated_cookie(headers) {
-        if next != original {
-            save_session(&next)?;
-        }
+        update_session_if_current(original, &next)?;
     }
     Ok(())
 }
 
 fn delete_session() -> Result<(), String> {
-    match keyring_entry()?.delete_credential() {
+    // Even if the OS rejects deletion, don't keep using the unlocked
+    // credential in memory after the user has requested disconnect.
+    let result = match keyring_entry()?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(_) => Err("Could not remove the saved Roblox session from the OS credential store.".into()),
-    }
+    };
+    lock_unlocked_session()?;
+    result
 }
 
 fn rotated_cookie(headers: &reqwest::header::HeaderMap) -> Option<String> {
@@ -379,16 +449,20 @@ pub async fn finish_roblox_login(app: AppHandle) -> Result<ConnectedAccount, Str
     }
 }
 
+/// Explicitly forget the unlocked in-process copy while keeping the OS
+/// Keychain credential. The next session-backed request will ask Keychain
+/// for access again if macOS chooses to require authorization.
+#[tauri::command]
+pub fn lock_roblox_session() -> Result<(), String> {
+    lock_unlocked_session()
+}
+
 #[tauri::command]
 pub async fn connected_roblox_account() -> Result<Option<ConnectedAccount>, String> {
     let Some(secret) = read_session()? else { return Ok(None) };
     let (account, rotated) = verify_cookie(&secret).await?;
     if let Some(next) = rotated {
-        // Updating an unchanged Keychain item may trigger yet another
-        // authorization dialog on some development builds.
-        if next != secret {
-            save_session(&next)?;
-        }
+        update_session_if_current(&secret, &next)?;
     }
     Ok(Some(account))
 }
@@ -431,6 +505,34 @@ pub async fn cancel_roblox_login(app: AppHandle, state: State<'_, AuthState>) ->
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_session_cache_reads_keychain_only_once() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let local_cache = Mutex::new(None);
+        let count = AtomicUsize::new(0);
+        let expected = "test-secret-no-real-credential";
+        let first = load_from_cache_or_keychain(&local_cache, || {
+            count.fetch_add(1, Ordering::SeqCst);
+            Ok(Some(expected.to_owned()))
+        }).unwrap();
+        assert_eq!(first.as_deref(), Some(expected));
+        let second = load_from_cache_or_keychain(&local_cache, || {
+            count.fetch_add(1, Ordering::SeqCst);
+            panic!("the OS Keychain should not be opened again")
+        }).unwrap();
+        assert_eq!(second.as_deref(), Some(expected));
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn native_session_cache_starts_locked() {
+        let cache = Mutex::new(None);
+        let first = load_from_cache_or_keychain(&cache, || Ok(None)).unwrap();
+        assert!(first.is_none());
+        let second = load_from_cache_or_keychain(&cache, || Ok(Some("test".into()))).unwrap();
+        assert_eq!(second.as_deref(), Some("test"));
+    }
 
     #[test]
     fn only_https_roblox_is_allowed_in_login_navigation() {
