@@ -10,6 +10,11 @@
   import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
   import { filterAndSortServers, isValidServerId } from "./lib/servers";
   import type { ServerSort } from "./lib/servers";
+  import {
+    REGION_OPTIONS, readRegionReports, regionLabel, reportForServer,
+    withRegionReport, withoutRegionReport, writeRegionReports
+  } from "./lib/regions";
+  import type { LocalRegionReport, RegionCode, RegionFilter } from "./lib/regions";
 
   type Tab = "home" | "library" | "servers" | "settings";
   type QuickLaunchItem = {
@@ -40,6 +45,10 @@
   let serverHideFull = false;
   let serverMaxPing = "any";
   let serverSearch = "";
+  let regionFilter: RegionFilter = "any";
+  let regionReports: LocalRegionReport[] = [];
+  let editingRegionId: string | null = null;
+  let regionDraft: RegionCode | "" = "";
   let serverLoadError = "";
   let autoAvatarEnabled = true;
   // Deliberately NOT persisted. Full-session credentials require fresh opt-in per app run.
@@ -83,8 +92,8 @@
   $: visibleServers = filterAndSortServers(servers, {
     sort: serverSort, hideFull: serverHideFull,
     maxPing: serverMaxPing === "any" ? null : Number(serverMaxPing),
-    search: serverSearch
-  });
+    search: serverSearch, region: regionFilter
+  }, regionReports, activePlaceId);
 
   $: filteredGames = games.filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
     String(game.placeId).includes(filter));
@@ -113,6 +122,7 @@
 
   onMount(() => {
     games = readLibrary();
+    regionReports = readRegionReports();
     selectedId = games[0]?.placeId ?? null;
     activePlaceId = selectedId;
     liteMode = readLiteMode();
@@ -448,6 +458,8 @@
     nextCursor = null;
     fetchedAt = null;
     serverLoadError = "";
+    editingRegionId = null;
+    regionDraft = "";
     expandedPreviewId = null;
     previewLoadingId = null;
     avatarPreviews = {};
@@ -497,6 +509,8 @@
     nextCursor = null;
     fetchedAt = null;
     serverLoadError = "";
+    editingRegionId = null;
+    regionDraft = "";
     expandedPreviewId = null;
     previewLoadingId = null;
     avatarPreviews = {};
@@ -504,6 +518,51 @@
     bulkPreviewVersion++;
     bulkPreviewRequested = [];
     bulkPreviewError = "";
+  }
+
+  function regionReportFor(serverId: string): LocalRegionReport | null {
+    return reportForServer(regionReports, activePlaceId, serverId);
+  }
+
+  function displayServerRegion(serverId: string): string {
+    const report = regionReportFor(serverId);
+    return report ? regionLabel(report.region) : "Unknown";
+  }
+
+  function editServerRegion(serverId: string) {
+    if (editingRegionId === serverId) {
+      editingRegionId = null;
+      regionDraft = "";
+      return;
+    }
+    editingRegionId = serverId;
+    regionDraft = regionReportFor(serverId)?.region ?? "";
+  }
+
+  function saveServerRegion(serverId: string) {
+    if (!activePlaceId || !isValidServerId(serverId) || !regionDraft) return;
+    try {
+      regionReports = writeRegionReports(
+        withRegionReport(regionReports, activePlaceId, serverId, regionDraft)
+      );
+      editingRegionId = null;
+      regionDraft = "";
+      notice("Your local region report was saved. It expires after two hours and is not verified.");
+    } catch {
+      notice("Could not store the local server-region report.", "bad");
+    }
+  }
+
+  function clearServerRegion(serverId: string) {
+    if (!activePlaceId) return;
+    try {
+      regionReports = writeRegionReports(withoutRegionReport(regionReports, activePlaceId, serverId));
+      editingRegionId = null;
+      regionDraft = "";
+      notice("Local region report cleared.");
+    } catch {
+      notice("Could not remove the local region report.", "bad");
+    }
   }
 
   async function play(placeId: number, jobId: string | null = null) {
@@ -552,6 +611,11 @@
       cursor = loadMore ? nextCursor : null;
       nextCursor = result.nextPageCursor;
       fetchedAt = new Date();
+      // Remove expired reports when a new public server sample is requested.
+      regionReports = regionReports.filter(entry => {
+        const age = Date.now() - entry.observedAt;
+        return age >= 0 && age < 2 * 60 * 60 * 1000;
+      });
       if (!loadMore && connectedAccount) void loadAutomaticAvatars();
       if (!servers.length) notice("No public servers returned for this place.");
     } catch (error) {
@@ -857,7 +921,7 @@
             </select>
             <button class="btn primary" disabled={!activePlaceId || loading} onclick={() => loadServers(false)}>{loading ? "Loading…" : "↻ Refresh"}</button>
           </div>
-          <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Regions are unknown until independently verified. Connected users see automatic anonymous avatar previews for up to eight loaded servers (unless disabled or in Lite Mode).</div>
+          <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Roblox does not provide verified server regions here. You can mark a region after checking it in-game: these labels stay on your device, are not shared, and expire after two hours. Connected users see automatic anonymous avatar previews for up to eight loaded servers (unless disabled or in Lite Mode).</div>
           <div class="server-filter-bar">
             <label for="server-sort">Sort
               <select id="server-sort" class="input" bind:value={serverSort}>
@@ -878,6 +942,15 @@
                 <option value="300">≤ 300 ms</option>
               </select>
             </label>
+            <label for="server-region">Region · local reports
+              <select id="server-region" class="input" bind:value={regionFilter}>
+                <option value="any">All regions</option>
+                <option value="unknown">Unknown only</option>
+                {#each REGION_OPTIONS as option}
+                  <option value={option.code}>{option.label}</option>
+                {/each}
+              </select>
+            </label>
             <label for="server-search">Server ID
               <input id="server-search" class="input" placeholder="Search loaded IDs" bind:value={serverSearch} />
             </label>
@@ -885,15 +958,25 @@
             
           </div>
           <div class="server-result-note">
-            <span>{visibleServers.length} shown / {servers.length} loaded · Region: <strong>Unknown</strong></span>
-            <button class="link-button" onclick={() => { serverSort = "default"; serverMaxPing = "any"; serverHideFull = false; serverSearch = ""; }}>Clear filters</button>
+            <span>{visibleServers.length} shown / {servers.length} loaded · {servers.filter(server => !!regionReportFor(server.id)).length} local region reports · No verified provider</span>
+            <button class="link-button" onclick={() => { serverSort = "default"; serverMaxPing = "any"; serverHideFull = false; serverSearch = ""; regionFilter = "any"; }}>Clear filters</button>
             {#if serverLoadError}<span class="server-error">Last request failed: {serverLoadError}</span>{/if}
             {#if bulkPreviewError}<span class="preview-error">Avatar preview issue: {bulkPreviewError}</span>{/if}
           </div>
-          <div class="table-head"><span>SERVER</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
+          <div class="table-head"><span>SERVER</span><span>REGION</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
           {#each visibleServers as server (server.id)}
             <div class="server-row">
               <span class="server-id"><span class="online-dot"></span><span title={server.id}>{server.id.slice(0, 8)}…</span></span>
+              <button
+                class="server-region-button"
+                class:reported={!!regionReportFor(server.id)}
+                title={regionReportFor(server.id) ? "Your unverified local report · expires after two hours · click to edit" : "Region unknown · click to add your own report after checking in-game"}
+                aria-label={"Region for server " + server.id + ": " + displayServerRegion(server.id) + ". Edit local report."}
+                onclick={() => editServerRegion(server.id)}
+              >
+                {#if regionReportFor(server.id)}<span class="region-source-marker">●</span>{/if}
+                {displayServerRegion(server.id)}
+              </button>
               <span><strong>{server.playing}</strong><span class="muted"> / {server.maxPlayers}</span></span>
               <span>{server.ping === null ? "—" : Math.round(server.ping) + " ms"}</span>
               <div class="server-actions">
@@ -901,6 +984,30 @@
                 <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join ↗</button>
               </div>
             </div>
+            {#if editingRegionId === server.id}
+              <div class="server-region-editor">
+                <div class="region-editor-copy">
+                  <strong>Report this server's region</strong>
+                  <span>Only after you have checked in-game. This is your unverified local label, not a Roblox or RoValra location. It expires in 2 hours.</span>
+                </div>
+                <label>
+                  <span>Region</span>
+                  <select class="input" aria-label="Region of this server" bind:value={regionDraft}>
+                    <option value="" disabled>Select region</option>
+                    {#each REGION_OPTIONS as option}
+                      <option value={option.code}>{option.label}</option>
+                    {/each}
+                  </select>
+                </label>
+                <div class="region-editor-actions">
+                  <button class="btn small primary" disabled={!regionDraft} onclick={() => saveServerRegion(server.id)}>Save locally</button>
+                  {#if regionReportFor(server.id)}
+                    <button class="btn small secondary" onclick={() => clearServerRegion(server.id)}>Clear</button>
+                  {/if}
+                  <button class="btn small secondary" onclick={() => editServerRegion(server.id)}>Cancel</button>
+                </div>
+              </div>
+            {/if}
             {#if expandedPreviewId === server.id || (autoAvatarEnabled && connectedAccount && !liteMode && ((avatarPreviews[server.id]?.length ?? 0) > 0 || (bulkPreviewBusy && bulkPreviewRequested.includes(server.id))))}
               <div class="server-avatar-panel" class:auto-loaded={expandedPreviewId !== server.id}>
                 <span class="preview-caption">Anonymous public avatar previews · no player names or IDs</span>
