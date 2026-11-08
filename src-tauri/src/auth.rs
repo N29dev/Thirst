@@ -9,9 +9,13 @@ use std::time::{Duration, Instant};
 
 use reqwest::header::{COOKIE, SET_COOKIE};
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager, State};
+#[cfg(any(not(target_os = "macos"), test))]
+use tauri::Url;
+#[cfg(not(target_os = "macos"))]
 use tauri::{
     webview::{NewWindowResponse, WebviewWindowBuilder},
-    AppHandle, Manager, State, Url, WebviewUrl,
+    WebviewUrl,
 };
 
 const CONSENT_SECS: u64 = 15;
@@ -45,6 +49,7 @@ struct RobloxUser {
     display_name: String,
 }
 
+#[cfg(any(not(target_os = "macos"), test))]
 fn roblox_login_host(url: &Url) -> bool {
     if url.scheme() != "https" || url.username() != "" || url.password().is_some() {
         return false;
