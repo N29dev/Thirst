@@ -2,6 +2,7 @@
 //! Session credentials are isolated in auth.rs, never returned over Tauri IPC.
 
 mod auth;
+mod activity;
 mod server_previews;
 mod rovalra;
 mod fastflags;
@@ -323,6 +324,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             launch_place,
+            activity::recent_player_sessions,
             list_public_servers,
             rovalra::lookup_rovalra_regions,
             server_previews::server_avatar_preview,
