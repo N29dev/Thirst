@@ -3,7 +3,7 @@
   import {
     beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
     disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview, fetchServerAvatarPreviews,
-    finishRobloxLogin, launchPlace, lookupGame, lookupRoValraRegions, openRobloxLogin, platformName, pollRobloxLoginStatus
+    finishRobloxLogin, launchPlace, lockRobloxSession, lookupGame, lookupRoValraRegions, openRobloxLogin, platformName, pollRobloxLoginStatus
   } from "./lib/backend";
   import type { ConnectedAccount } from "./lib/backend";
   import { isTrustedIconUrl, parsePlaceId, readAutoAvatarPreviews, readLibrary, readLibrarySort, readLiteMode, readRoValraEnabled, writeAutoAvatarPreviews, writeLibrary, writeLibrarySort, writeLiteMode, writeRoValraEnabled } from "./lib/library";
@@ -270,6 +270,16 @@
       await cancelRobloxLogin();
     } catch {
       notice("Could not close the isolated login window.", "bad");
+    }
+  }
+
+  async function lockSavedSession() {
+    if (loginBusy) return;
+    try {
+      await lockRobloxSession();
+      notice("Unlocked Roblox cookie cleared from Thirst's memory. The next session-backed request may need macOS Keychain approval.");
+    } catch (error) {
+      notice("Could not lock native Roblox session: " + String(error), "bad");
     }
   }
 
@@ -1184,7 +1194,7 @@
           <section class="panel settings-panel account-settings">
             <div class="account-info">
               <h3>Roblox account</h3>
-              <p>Optional official Roblox login. On macOS Thirst uses a separate native Swift/WebKit sign-in window; on Windows it uses an isolated Tauri webview. Session credentials are handled by native code and stored locally in your OS credential vault, never in the Thirst UI, SQLite, or our server.</p>
+              <p>Optional official Roblox login. On macOS Thirst uses a separate native Swift/WebKit sign-in window; on Windows it uses an isolated Tauri webview. Session credentials are stored in your OS credential vault and reused in native-only, zeroizing process memory while Thirst is running, so Refresh does not repeatedly open Keychain. The cookie never enters the Thirst UI, SQLite, or our server.</p>
               {#if connectedAccount}
                 <div class="connected-account">
                   <span class="connected-indicator"></span>
@@ -1201,6 +1211,9 @@
               <div class="account-buttons">
                 <button class="btn primary" onclick={beginLogin} disabled={loginBusy}>Connect Roblox account</button>
                 <button class="btn secondary" onclick={loadConnectedAccount} disabled={checkingAccount}>↻ Check status</button>
+                {#if connectedAccount}
+                  <button class="btn secondary" onclick={lockSavedSession} disabled={loginBusy} title="Forget the in-memory cookie without disconnecting your Roblox account. The next session-backed request may prompt for Keychain access.">Lock session memory</button>
+                {/if}
                 {#if connectedAccount || accountError}
                   <button class="btn danger subtle" onclick={disconnectAccount} disabled={loginBusy}>Disconnect / delete local credential</button>
                 {/if}
@@ -1224,7 +1237,7 @@
           <p class="consent-lead">Thirst will access your <strong>.ROBLOSECURITY session cookie</strong> after you sign in on the official Roblox website. This cookie can grant full access to your account.</p>
           <div class="consent-disclosure">
             <div><strong>What Thirst will access</strong><p>A Roblox session cookie from an isolated sign-in window. A stolen copy may let someone access your account without your password or 2-step verification.</p></div>
-            <div><strong>Where it will be stored</strong><p>Locally using macOS Keychain or Windows Credential Manager, not in browser localStorage, project files, logs or cloud storage.</p></div>
+            <div><strong>Where it will be stored</strong><p>In macOS Keychain or Windows Credential Manager, plus a native-only in-memory copy while Thirst runs to prevent repeated Keychain prompts. Memory is cleared on exit, disconnect, or when you click Lock session memory. Never in browser localStorage, project files, logs or cloud storage.</p></div>
             <div><strong>Where it will be sent</strong><p>Normally only to Roblox's fixed account-verification endpoint. If you separately enable authenticated server avatars in Settings, native Rust also sends it to fixed games.roblox.com and thumbnails.roblox.com endpoints. No Thirst, RoValra or Discord server receives it.</p></div>
             <div><strong>Important limitations</strong><p>Native local malware or a compromised launcher build could still steal a cookie. This is an experimental feature and is not independently security-audited.</p></div>
           </div>
