@@ -3,6 +3,8 @@
 //! Svelte, the Tauri IPC return value, logs, extensions, or third-party hosts.
 
 use std::sync::Mutex;
+#[cfg(target_os = "macos")]
+use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
 use reqwest::header::{COOKIE, SET_COOKIE};
@@ -15,10 +17,16 @@ use tauri::{
 const CONSENT_SECS: u64 = 15;
 const KEYRING_SERVICE: &str = "dev.n29.thirst.roblox";
 const KEYRING_NAME: &str = "primary-session";
+#[cfg(target_os = "macos")]
+const PENDING_KEYRING_NAME: &str = "pending-login";
+#[cfg(target_os = "macos")]
+const MACOS_HELPER: &str = concat!(env!("OUT_DIR"), "/ThirstLogin");
 
 #[derive(Default)]
 pub struct AuthState {
     started: Mutex<Option<Instant>>,
+    #[cfg(target_os = "macos")]
+    helper: Mutex<Option<Child>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -49,6 +57,68 @@ fn roblox_login_host(url: &Url) -> bool {
 fn keyring_entry() -> Result<keyring::Entry, String> {
     keyring::Entry::new(KEYRING_SERVICE, KEYRING_NAME)
         .map_err(|_| "Could not initialize your operating system's secure credential store.".into())
+}
+
+// macOS uses a separate native Swift WKWebView, like AppleBlox's browser
+// approach. It writes a *pending* cookie into Keychain; no cookie is transferred
+// by stdout, command arguments, filesystem, IPC, or a frontend script.
+#[cfg(target_os = "macos")]
+fn pending_entry() -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYRING_SERVICE, PENDING_KEYRING_NAME)
+        .map_err(|_| "Could not initialize the temporary macOS Keychain entry.".into())
+}
+
+#[cfg(target_os = "macos")]
+fn read_pending_session() -> Result<Option<String>, String> {
+    match pending_entry()?.get_password() {
+        Ok(value) => Ok(Some(value)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(_) => Err("Could not read the pending macOS Keychain login entry.".into()),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn delete_pending_session() -> Result<(), String> {
+    match pending_entry()?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(_) => Err("Could not clear the pending macOS Keychain login entry.".into()),
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn stop_native_helper(state: &AuthState) -> Result<(), String> {
+    let mut helper = state.helper.lock()
+        .map_err(|_| "Native login state could not be accessed.".to_owned())?;
+    if let Some(mut child) = helper.take() {
+        if child.try_wait().ok().flatten().is_none() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn start_native_helper(state: &AuthState) -> Result<(), String> {
+    let mut helper = state.helper.lock()
+        .map_err(|_| "Native login state could not be accessed.".to_owned())?;
+    if let Some(child) = helper.as_mut() {
+        if child.try_wait().map_err(|_| "Could not inspect the sign-in helper.".to_owned())?.is_none() {
+            return Ok(());
+        }
+    }
+    // Clear only the pending session. Never replace a stored account until
+    // verify_cookie succeeds in finish_roblox_login.
+    delete_pending_session()?;
+    let child = Command::new(MACOS_HELPER)
+        .arg(std::process::id().to_string())
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| "Could not launch native macOS login. Xcode tools and a trusted Thirst build are required.".to_owned())?;
+    *helper = Some(child);
+    Ok(())
 }
 
 // Errors must never include cookie values, body text or request headers.
@@ -147,6 +217,16 @@ pub async fn open_roblox_login(
     if !accepted {
         return Err("The 15-second consent review has not finished.".into());
     }
+    #[cfg(target_os = "macos")]
+    {
+        // Use AppleBlox-style native WKWebView on macOS instead of Tauri's
+        // in-app webview, which is not rendering Roblox login reliably.
+        let _ = app;
+        return start_native_helper(&state);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
     if let Some(existing) = app.get_webview_window("roblox-login") {
         existing.set_focus().map_err(|_| "Could not focus Roblox sign-in.".to_owned())?;
         return Ok(());
@@ -165,20 +245,46 @@ pub async fn open_roblox_login(
         .build()
         .map_err(|_| "Could not open isolated Roblox login. Check that WebView is available.".to_owned())?;
     Ok(())
+    }
 }
 
 /// Retry an incomplete embedded login without relaxing navigation restrictions.
 /// Does not access, transmit, or disclose any session cookie.
 #[tauri::command]
 pub async fn reload_roblox_login(app: AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app;
+        return Err("Use the Reload button in the native Roblox login window on macOS.".into());
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
     let webview = app.get_webview_window("roblox-login")
         .ok_or("The isolated sign-in window is closed. Cancel and reconnect to reopen it.")?;
     webview.reload()
         .map_err(|_| "Could not reload the official Roblox sign-in page.".to_owned())
+    }
 }
 
 #[tauri::command]
 pub async fn finish_roblox_login(app: AppHandle) -> Result<ConnectedAccount, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app;
+        let token = read_pending_session()?.ok_or(
+            "Native Roblox sign-in is not complete yet. Finish in its window; it will close automatically."
+        )?;
+        if token.len() > 8192 || token.len() < 50 {
+            return Err("The pending Roblox session is invalid.".into());
+        }
+        let (account, rotation) = verify_cookie(&token).await?;
+        save_session(rotation.as_deref().unwrap_or(&token))?;
+        delete_pending_session()?;
+        return Ok(account);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
     let webview = app.get_webview_window("roblox-login")
         .ok_or("Open the official Roblox login window first.")?;
     // This native API retrieves HttpOnly cookies; NO IPC invocation returns them.
@@ -201,6 +307,7 @@ pub async fn finish_roblox_login(app: AppHandle) -> Result<ConnectedAccount, Str
     let _ = webview.clear_all_browsing_data();
     let _ = webview.close();
     Ok(account)
+    }
 }
 
 #[tauri::command]
@@ -214,7 +321,12 @@ pub async fn connected_roblox_account() -> Result<Option<ConnectedAccount>, Stri
 }
 
 #[tauri::command]
-pub async fn disconnect_roblox_account(app: AppHandle) -> Result<(), String> {
+pub async fn disconnect_roblox_account(app: AppHandle, state: State<'_, AuthState>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        stop_native_helper(&state)?;
+        delete_pending_session()?;
+    }
     delete_session()?;
     if let Some(login) = app.get_webview_window("roblox-login") {
         let _ = login.clear_all_browsing_data();
@@ -226,7 +338,12 @@ pub async fn disconnect_roblox_account(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn cancel_roblox_login(app: AppHandle) -> Result<(), String> {
+pub async fn cancel_roblox_login(app: AppHandle, state: State<'_, AuthState>) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        stop_native_helper(&state)?;
+        delete_pending_session()?;
+    }
     if let Some(login) = app.get_webview_window("roblox-login") {
         let _ = login.clear_all_browsing_data();
         let _ = login.close();
