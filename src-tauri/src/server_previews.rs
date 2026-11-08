@@ -33,7 +33,7 @@ impl PreviewCache {
         if cache.len() > MAX_CACHED_SERVERS { cache.clear(); }
         for server in page.data.iter().take(25) {
             let Ok(uuid) = uuid::Uuid::parse_str(&server.id) else { continue };
-            let tokens: Vec<String> = server.player_tokens.iter()
+            let tokens: Vec<String> = server.player_tokens.as_deref().unwrap_or(&[]).iter()
                 .filter(|token| !token.is_empty() && token.len() <= 1024 && token.is_ascii())
                 .take(MAX_PREVIEW_AVATARS)
                 .cloned()
@@ -141,7 +141,7 @@ mod tests {
                 playing: 8,
                 max_players: 10,
                 ping: Some(70.0),
-                player_tokens: vec!["a".into(), "b".into(), "c".into(), "d".into(), "e".into(), "f".into()],
+                player_tokens: Some(vec!["a".into(), "b".into(), "c".into(), "d".into(), "e".into(), "f".into()]),
             }],
             next_page_cursor: None,
         };
