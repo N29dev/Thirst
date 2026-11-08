@@ -4,7 +4,7 @@
 //! There is no scraping, hidden endpoint discovery, or background polling.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::State;
@@ -43,6 +43,7 @@ pub struct ProviderRegion {
     region: Option<String>,
     country: Option<String>,
     source: &'static str,
+    via: &'static str,
 }
 
 fn safe_location(value: Option<String>) -> Option<String> {
@@ -75,7 +76,78 @@ fn normalise_result(source: ProviderServer, ids: &HashSet<String>) -> Option<Pro
         region,
         country,
         source: "rovalra",
+        via: "direct",
     })
+}
+
+// Glutony shares cached RoValra locations with the user's BL:R website and
+// Discord bot. A distributed Thirst build must never contain an API token:
+// this endpoint is read-only and limits lookups to active sampled BL:R servers.
+const GLUTONY_REGIONS_URL: &str =
+    "https://glutony.scp343hey.workers.dev/api/servers/regions/shared";
+
+fn glutony_mode(place_id: u64) -> Option<&'static str> {
+    match place_id {
+        124087144919678 => Some("8v8"),
+        99999183305180 => Some("pro"),
+        18668065416 => Some("main"),
+        _ => None,
+    }
+}
+
+#[derive(Deserialize)]
+struct SharedRegionEnvelope {
+    regions: HashMap<String, SharedRegionEntry>,
+}
+
+#[derive(Deserialize)]
+struct SharedRegionEntry {
+    city: Option<String>,
+    state: Option<String>,
+    country: Option<String>,
+}
+
+fn parse_shared_regions(
+    body: SharedRegionEnvelope,
+    requested: &HashSet<String>,
+) -> Vec<ProviderRegion> {
+    body.regions.into_iter().filter_map(|(id, entry)| {
+        let id = uuid::Uuid::parse_str(&id).ok()?.to_string();
+        let mut region = normalise_result(ProviderServer {
+            server_id: id,
+            city: entry.city,
+            region: entry.state,
+            country: entry.country,
+        }, requested)?;
+        region.via = "glutony";
+        Some(region)
+    }).collect()
+}
+
+async fn lookup_shared_regions(
+    client: &reqwest::Client,
+    place_id: u64,
+    ids: &[String],
+    requested: &HashSet<String>,
+) -> Result<Vec<ProviderRegion>, String> {
+    let Some(mode) = glutony_mode(place_id) else { return Ok(Vec::new()) };
+    // Only send public BL:R place IDs and server UUIDs. Never send cookies,
+    // Roblox identity, Cloudflare secrets, or raw tokens.
+    let response = client.get(GLUTONY_REGIONS_URL)
+        .query(&[("mode", mode), ("ids", &ids.join(","))])
+        .send().await
+        .map_err(|_| "Glutony shared region cache is unreachable.".to_owned())?;
+    if !response.status().is_success() {
+        return Err(format!("Glutony region cache unavailable (HTTP {}).", response.status().as_u16()));
+    }
+    let body = response.bytes().await
+        .map_err(|_| "Could not read Glutony's region response.".to_owned())?;
+    if body.len() > 128 * 1024 {
+        return Err("Shared region response is unexpectedly large.".into());
+    }
+    let parsed: SharedRegionEnvelope = serde_json::from_slice(&body)
+        .map_err(|_| "Glutony's shared region response is not recognized.".to_owned())?;
+    Ok(parse_shared_regions(parsed, requested))
 }
 
 /// Runs only when the user chooses the RoValra action. Place/server IDs are
@@ -122,15 +194,32 @@ pub async fn lookup_rovalra_regions(
         .build()
         .map_err(|_| "Could not configure the optional region lookup.".to_owned())?;
 
-    // No credentials, user IDs, IP geolocation or full URLs from the UI.
+    // BL:R regions are first requested through Glutony's bounded D1-backed
+    // shared cache. When a server wasn't in the bot's recent public sample,
+    // direct RoValra remains a fallback rather than making it disappear.
+    let mut shared = if glutony_mode(place_id).is_some() {
+        lookup_shared_regions(&client, place_id, &sorted_ids, &ids)
+            .await.unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    let known: HashSet<String> = shared.iter().map(|region| region.server_id.clone()).collect();
+    let missing: Vec<String> = sorted_ids.into_iter()
+        .filter(|id| !known.contains(id)).collect();
+    if missing.is_empty() {
+        shared.truncate(MAX_SERVERS);
+        return Ok(shared);
+    }
+
+    // No credentials, user IDs, IP geolocation or arbitrary URLs from the UI.
     let response = client
         .get("https://apis.rovalra.com/v1/servers/details")
         .query(&[
             ("place_id", place_id.to_string()),
-            ("server_ids", sorted_ids.join(",")),
+            ("server_ids", missing.join(",")),
         ])
         .send().await
-        .map_err(|_| "RoValra region service was unreachable. Roblox server browsing is unaffected.".to_owned())?;
+        .map_err(|_| "RoValra is unreachable for servers not yet cached by Glutony.".to_owned())?;
 
     match response.status().as_u16() {
         429 => {
@@ -159,10 +248,12 @@ pub async fn lookup_rovalra_regions(
     if envelope.status.as_deref() != Some("success") {
         return Err("RoValra did not return a successful region lookup.".into());
     }
-    Ok(envelope.servers.into_iter()
+    shared.extend(envelope.servers.into_iter()
         .filter_map(|item| normalise_result(item, &ids))
-        .take(MAX_SERVERS)
-        .collect())
+        .filter(|item| !known.contains(&item.server_id))
+        .take(MAX_SERVERS));
+    shared.truncate(MAX_SERVERS);
+    Ok(shared)
 }
 
 #[cfg(test)]
@@ -184,6 +275,32 @@ mod tests {
             server_id: "550e8400-e29b-41d4-a716-446655440001".into(),
             city: Some("Paris".into()), region: None, country: Some("FR".into()),
         }, &accepted).is_none());
+    }
+
+    #[test]
+    fn maps_blr_modes_without_hardcoded_tokens() {
+        assert_eq!(glutony_mode(124087144919678), Some("8v8"));
+        assert_eq!(glutony_mode(99999183305180), Some("pro"));
+        assert_eq!(glutony_mode(18668065416), Some("main"));
+        assert_eq!(glutony_mode(9999), None);
+    }
+
+    #[test]
+    fn parses_only_requested_shared_region_entries() {
+        let id = "550e8400-e29b-41d4-a716-446655440000";
+        let requested = HashSet::from([id.to_owned()]);
+        let regions = HashMap::from([
+            (id.to_owned(), SharedRegionEntry {
+                city: Some("São Paulo".into()), state: None, country: Some("Brazil".into())
+            }),
+            ("550e8400-e29b-41d4-a716-446655440001".into(), SharedRegionEntry {
+                city: Some("New York".into()), state: None, country: Some("United States".into())
+            })
+        ]);
+        let result = parse_shared_regions(SharedRegionEnvelope {regions}, &requested);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].via, "glutony");
+        assert_eq!(result[0].country.as_deref(), Some("Brazil"));
     }
 
     #[test]
