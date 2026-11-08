@@ -6,10 +6,11 @@
     finishRobloxLogin, launchPlace, lookupGame, openRobloxLogin, platformName, pollRobloxLoginStatus
   } from "./lib/backend";
   import type { ConnectedAccount } from "./lib/backend";
-  import { isTrustedIconUrl, parsePlaceId, readAutoAvatarPreviews, readLibrary, readLiteMode, writeAutoAvatarPreviews, writeLibrary, writeLiteMode } from "./lib/library";
+  import { isTrustedIconUrl, parsePlaceId, readAutoAvatarPreviews, readLibrary, readLibrarySort, readLiteMode, writeAutoAvatarPreviews, writeLibrary, writeLibrarySort, writeLiteMode } from "./lib/library";
   import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
   import { filterAndSortServers, isValidServerId } from "./lib/servers";
   import type { ServerSort } from "./lib/servers";
+  import type { LibrarySort } from "./lib/library";
   import {
     REGION_OPTIONS, readRegionReports, regionLabel, reportForServer,
     withRegionReport, withoutRegionReport, writeRegionReports
@@ -34,6 +35,7 @@
   let newSubplaceName = "";
   let newSubplaceId = "";
   let filter = "";
+  let librarySort: LibrarySort = "saved";
   let liteMode = false;
   let platform = "Desktop";
   let toast = "";
@@ -95,8 +97,16 @@
     search: serverSearch, region: regionFilter
   }, regionReports, activePlaceId);
 
-  $: filteredGames = games.filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
-    String(game.placeId).includes(filter));
+  $: filteredGames = games
+    .filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
+      String(game.placeId).includes(filter))
+    .slice()
+    .sort((a, b) => {
+      if (librarySort === "name") return a.name.localeCompare(b.name);
+      if (librarySort === "newest") return b.addedAt - a.addedAt;
+      if (librarySort === "oldest") return a.addedAt - b.addedAt;
+      return 0; // preserve saved order, including existing bookmarks
+    });
   $: quickLaunchItems = games.flatMap((game): QuickLaunchItem[] => [
     {
       placeId: game.placeId, parentPlaceId: game.placeId,
@@ -126,6 +136,7 @@
     selectedId = games[0]?.placeId ?? null;
     activePlaceId = selectedId;
     liteMode = readLiteMode();
+    librarySort = readLibrarySort();
     autoAvatarEnabled = readAutoAvatarPreviews();
     platformName().then(value => platform = value).catch(() => platform = "Desktop");
     // Prevent a pending notification callback from outliving the desktop window.
@@ -530,6 +541,12 @@
     }
   }
 
+  function setLibrarySort(sort: LibrarySort) {
+    librarySort = sort;
+    try { writeLibrarySort(sort); }
+    catch { notice("Could not save library sort preference.", "bad"); }
+  }
+
   function regionReportFor(serverId: string): LocalRegionReport | null {
     return reportForServer(regionReports, activePlaceId, serverId);
   }
@@ -825,6 +842,15 @@
           <div class="panel">
             <div class="panel-header"><h3>Saved experiences</h3></div>
             <input class="input search" aria-label="Filter saved games" placeholder="⌕  Find a game…" bind:value={filter} />
+            <div class="library-sort-controls">
+              <label for="library-sort">Sort library</label>
+              <select id="library-sort" class="input" value={librarySort} onchange={e => setLibrarySort(e.currentTarget.value as LibrarySort)}>
+                <option value="saved">Saved order</option>
+                <option value="name">Name A–Z</option>
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </div>
             <div class="games-list">
               {#each filteredGames as game (game.placeId)}
                 <button class:selected={selectedId === game.placeId} class="game-row" onclick={() => selectGame(game.placeId)}>
