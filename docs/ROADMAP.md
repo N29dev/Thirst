@@ -21,7 +21,7 @@ This document tracks features requested during the first successful macOS alpha 
 - [x] Sort the My Library experience list by saved order, name A–Z, newest and oldest, with a local-only preference. The Overview shortcut order remains unchanged.
 - [x] Recently opened place shortcuts (not short-lived server UUIDs), with clearable local history.
 - [x] Portable JSON backup of saved games and pinned subplaces; validated merge that preserves existing bookmarks.
-- [ ] Optional manual reordering of games and pinned subplaces.
+- [x] Move saved experiences and subplaces up/down without altering IDs or pin state; Overview shortcuts follow the resulting saved order.
 - [ ] Toast notifications have accessible dismissal and auto-hide; verify no overlap with game launch.
 
 ## Alpha 0.3 — Account and consent
