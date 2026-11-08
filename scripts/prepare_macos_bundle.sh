@@ -16,6 +16,11 @@ swiftc -O "$TAURI/native/macos/ThirstLogin.swift" \
   -framework AppKit -framework WebKit -framework Security \
   -o "$TAURI/resources/ThirstLogin"
 chmod 755 "$TAURI/resources/ThirstLogin"
+# Apple Silicon requires signed native executables. This helper is bundled as
+# an executable resource, so sign it independently before Tauri signs the
+# outer .app. An ad-hoc signature is not Apple notarization.
+codesign --force --sign - --timestamp=none "$TAURI/resources/ThirstLogin"
+codesign --verify --strict "$TAURI/resources/ThirstLogin"
 
 # Produce a native macOS icon from the existing Thirst artwork. Generated
 # icons are build outputs, not source images that need to be committed.
