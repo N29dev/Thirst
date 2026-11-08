@@ -8,6 +8,10 @@
   import type { ConnectedAccount } from "./lib/backend";
   import { isTrustedIconUrl, parsePlaceId, readLibrary, readLiteMode, writeLibrary, writeLiteMode } from "./lib/library";
   import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
+  import {
+    favoriteKey, filterAndSortServers, isValidServerId, readFavoriteServers, writeFavoriteServers
+  } from "./lib/servers";
+  import type { FavoriteServer, ServerSort } from "./lib/servers";
 
   type Tab = "home" | "library" | "servers" | "settings";
   type QuickLaunchItem = {
@@ -34,6 +38,13 @@
   let toastTimeout: ReturnType<typeof setTimeout> | undefined;
   let loading = false;
   let servers: PublicServer[] = [];
+  let favoriteServers: FavoriteServer[] = [];
+  let serverSort: ServerSort = "default";
+  let serverHideFull = false;
+  let serverMaxPing = "any";
+  let serverFavoritesOnly = false;
+  let serverSearch = "";
+  let serverLoadError = "";
   let cursor: string | null = null;
   let nextCursor: string | null = null;
   let fetchedAt: Date | null = null;
@@ -61,6 +72,14 @@
   let hoverPending: { target: HTMLElement; x: number; y: number } | null = null;
 
   $: selected = games.find(game => game.placeId === selectedId) || null;
+  $: visibleServers = filterAndSortServers(servers, {
+    sort: serverSort, hideFull: serverHideFull,
+    maxPing: serverMaxPing === "any" ? null : Number(serverMaxPing),
+    favoritesOnly: serverFavoritesOnly,
+    search: serverSearch
+  }, favoriteServers, activePlaceId);
+  $: savedForPlace = favoriteServers.filter(item => item.placeId === activePlaceId);
+
   $: filteredGames = games.filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
     String(game.placeId).includes(filter));
   $: quickLaunchItems = games.flatMap((game): QuickLaunchItem[] => [
@@ -88,6 +107,7 @@
 
   onMount(() => {
     games = readLibrary();
+    favoriteServers = readFavoriteServers();
     selectedId = games[0]?.placeId ?? null;
     activePlaceId = selectedId;
     liteMode = readLiteMode();
@@ -416,6 +436,7 @@
     cursor = null;
     nextCursor = null;
     fetchedAt = null;
+    serverLoadError = "";
   }
 
   function removeGame() {
@@ -457,6 +478,7 @@
     cursor = null;
     nextCursor = null;
     fetchedAt = null;
+    serverLoadError = "";
   }
 
   async function play(placeId: number, jobId: string | null = null) {
@@ -469,21 +491,57 @@
   }
 
   async function loadServers(loadMore = false) {
-    if (!activePlaceId || loading) return;
+    if (!activePlaceId || loading || (loadMore && !nextCursor)) return;
+    const requestedPlace = activePlaceId;
     loading = true;
+    serverLoadError = "";
     try {
-      const result = await fetchPublicServers(activePlaceId, loadMore ? nextCursor : null);
-      servers = loadMore ? [...servers, ...result.data.filter(s => !servers.some(old => old.id === s.id))] : result.data;
+      const result = await fetchPublicServers(requestedPlace, loadMore ? nextCursor : null);
+      // If the selected subplace changes while a request is outstanding, ignore
+      // the old result rather than mixing server lists from two places.
+      if (activePlaceId !== requestedPlace) return;
+      servers = loadMore ?
+        [...servers, ...result.data.filter(server => !servers.some(old => old.id === server.id))] :
+        result.data;
       cursor = loadMore ? nextCursor : null;
       nextCursor = result.nextPageCursor;
       fetchedAt = new Date();
       if (!servers.length) notice("No public servers returned for this place.");
     } catch (error) {
-      notice("Could not fetch servers: " + String(error), "bad");
+      if (activePlaceId === requestedPlace) {
+        serverLoadError = String(error);
+        notice("Could not fetch servers: " + serverLoadError, "bad");
+      }
     } finally {
       loading = false;
     }
   }
+
+  function isSavedServer(serverId: string): boolean {
+    return activePlaceId !== null && favoriteServers.some(item =>
+      favoriteKey(item.placeId, item.serverId) === favoriteKey(activePlaceId!, serverId));
+  }
+
+  function toggleSavedServer(serverId: string) {
+    if (!activePlaceId || !isValidServerId(serverId)) {
+      return notice("Roblox returned an invalid server identifier.", "bad");
+    }
+    const key = favoriteKey(activePlaceId, serverId);
+    const exists = favoriteServers.some(item => favoriteKey(item.placeId, item.serverId) === key);
+    if (!exists && favoriteServers.length >= 120) {
+      return notice("Saved server limit reached (120).", "bad");
+    }
+    favoriteServers = exists
+      ? favoriteServers.filter(item => favoriteKey(item.placeId, item.serverId) !== key)
+      : [...favoriteServers, { placeId: activePlaceId, serverId, addedAt: Date.now() }];
+    try {
+      writeFavoriteServers(favoriteServers);
+      notice(exists ? "Server removed from favorites." : "Server saved. It may disappear when Roblox closes the instance.");
+    } catch {
+      notice("Could not save server favorites locally.", "bad");
+    }
+  }
+
 
   function setLiteMode(enabled: boolean) {
     liteMode = enabled;
@@ -686,20 +744,69 @@
             </select>
             <button class="btn primary" disabled={!activePlaceId || loading} onclick={() => loadServers(false)}>{loading ? "Loading…" : "↻ Refresh"}</button>
           </div>
-          <div class="server-disclaimer">Ping shown below is reported by Roblox for each server, <strong>not your personal network ping.</strong> Public server data and pagination can be incomplete or rate-limited.</div>
-          <div class="table-head"><span>SERVER</span><span>PLAYERS</span><span>PING</span><span></span></div>
-          {#each servers as server (server.id)}
+          <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Regions are unknown until independently verified.</div>
+          <div class="server-filter-bar">
+            <label for="server-sort">Sort
+              <select id="server-sort" class="input" bind:value={serverSort}>
+                <option value="default">Roblox order</option>
+                <option value="lowest-ping">Lowest reported ping</option>
+                <option value="most-players">Most players</option>
+                <option value="fewest-players">Fewest players</option>
+                <option value="most-slots">Most free slots</option>
+              </select>
+            </label>
+            <label for="server-ping">Reported ping
+              <select id="server-ping" class="input" bind:value={serverMaxPing}>
+                <option value="any">Any</option>
+                <option value="50">≤ 50 ms</option>
+                <option value="100">≤ 100 ms</option>
+                <option value="150">≤ 150 ms</option>
+                <option value="200">≤ 200 ms</option>
+                <option value="300">≤ 300 ms</option>
+              </select>
+            </label>
+            <label for="server-search">Server ID
+              <input id="server-search" class="input" placeholder="Search loaded IDs" bind:value={serverSearch} />
+            </label>
+            <label class="server-checkbox"><input type="checkbox" bind:checked={serverHideFull} /> Free slots only</label>
+            <label class="server-checkbox"><input type="checkbox" bind:checked={serverFavoritesOnly} /> Saved only</label>
+          </div>
+          <div class="server-result-note">
+            <span>{visibleServers.length} shown / {servers.length} loaded · Region: <strong>Unknown</strong></span>
+            {#if serverLoadError}<span class="server-error">Last request failed: {serverLoadError}</span>{/if}
+          </div>
+          <div class="table-head"><span>SERVER</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
+          {#each visibleServers as server (server.id)}
             <div class="server-row">
-              <span class="server-id"><span class="online-dot"></span>{server.id.slice(0, 8)}…</span>
+              <span class="server-id"><span class="online-dot"></span><span title={server.id}>{server.id.slice(0, 8)}…</span></span>
               <span><strong>{server.playing}</strong><span class="muted"> / {server.maxPlayers}</span></span>
               <span>{server.ping === null ? "—" : Math.round(server.ping) + " ms"}</span>
-              <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join ↗</button>
+              <div class="server-actions">
+                <button class:saved={isSavedServer(server.id)} class="server-star" aria-pressed={isSavedServer(server.id)} title={isSavedServer(server.id) ? "Unsave this server" : "Save this server ID"} aria-label={isSavedServer(server.id) ? "Unsave server " + server.id : "Save server " + server.id} onclick={() => toggleSavedServer(server.id)}>{isSavedServer(server.id) ? "★" : "☆"}</button>
+                <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join ↗</button>
+              </div>
             </div>
           {:else}
-            <div class="empty-state server-empty"><div class="empty-mark">◎</div><strong>No server data loaded</strong><p>{games.length ? "Select a saved place and click Refresh to fetch its public servers." : "Add an experience in your library to browse its servers."}</p></div>
+            <div class="empty-state server-empty"><div class="empty-mark">◎</div>
+              <strong>{servers.length ? "No loaded servers match these filters" : "No server data loaded"}</strong>
+              <p>{servers.length ? "Try clearing your filters or load another page." : games.length ? "Select a saved place and click Refresh to fetch its public servers." : "Add an experience in your library to browse its servers."}</p>
+            </div>
           {/each}
+          {#if savedForPlace.length}
+            <div class="saved-server-panel">
+              <div><strong>★ Saved server IDs ({savedForPlace.length})</strong><p>These are bookmarks, not confirmed live instances. If an instance closes, its ID can no longer be joined.</p></div>
+              {#each savedForPlace as item (item.serverId)}
+                <div class="saved-server-item">
+                  <code title={item.serverId}>{item.serverId.slice(0, 18)}…</code>
+                  <span class="muted">{servers.some(server => server.id.toLowerCase() === item.serverId) ? "Seen in loaded results" : "Not verified"}</span>
+                  <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, item.serverId)}>Try join</button>
+                  <button class="server-star" title="Remove saved server" aria-label={"Remove saved server " + item.serverId} onclick={() => toggleSavedServer(item.serverId)}>×</button>
+                </div>
+              {/each}
+            </div>
+          {/if}
           {#if fetchedAt}
-            <div class="server-footer"><span>Last refreshed: {fetchedAt.toLocaleTimeString()}</span>
+            <div class="server-footer"><span>Last refreshed: {fetchedAt.toLocaleTimeString()} · {servers.length} loaded</span>
               {#if nextCursor}<button class="btn secondary small" disabled={loading} onclick={() => loadServers(true)}>{loading ? "Loading…" : "Load more ↓"}</button>{/if}
             </div>
           {/if}
