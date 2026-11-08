@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
+  import UiIcon from "./UiIcon.svelte";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
   import { historyEnabled, readActivityHistory, recordLaunchAttempt } from "./lib/activity";
@@ -40,6 +43,14 @@
   let releaseCheckError = "";
   let releaseCheckTimer: ReturnType<typeof setTimeout> | undefined;
   let tab: Tab = "home";
+  let reducedMotion = false;
+  let previousTab: Tab = "home";
+  // Reset scroll when switching screens. A previous page's scroll position
+  // must not strand users halfway down another page.
+  $: if (tab !== previousTab) {
+    previousTab = tab;
+    if (typeof window !== "undefined") window.scrollTo(0, 0);
+  }
   let games: SavedGame[] = [];
   let recentLaunches: RecentLaunch[] = [];
   let selectedId: number | null = null;
@@ -153,6 +164,7 @@
     : [];
 
   onMount(() => {
+    reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     games = readLibrary();
     recentLaunches = readRecentLaunches();
     regionReports = readRegionReports();
@@ -1035,7 +1047,7 @@
   <meta name="description" content="Thirst: a lightweight Roblox launcher for desktop." />
 </svelte:head>
 
-<div class:lite={liteMode} class="app">
+<div class:lite={liteMode} class="app" data-page={tab}>
   <aside class="sidebar">
     <button class="brand" onclick={() => tab = "home"} aria-label="Thirst home">
       <span class="logo"><span class="logo-letter">T</span></span>
@@ -1043,14 +1055,14 @@
     </button>
     <span class="section-label">WORKSPACE</span>
     <nav aria-label="Main navigation">
-      <button class:active={tab === "home"} onclick={() => tab = "home"}><span class="nav-icon">⌂</span> Overview</button>
-      <button class:active={tab === "library"} onclick={() => tab = "library"}><span class="nav-icon">▦</span> My library <span class="nav-count">{games.length}</span></button>
-      <button class:active={tab === "servers"} onclick={enterServerBrowser}><span class="nav-icon">◎</span> Server browser</button>
+      <button class:active={tab === "home"} aria-current={tab === "home" ? "page" : undefined} title="Overview" onclick={() => tab = "home"}><span class="nav-icon"><UiIcon name="home" size={19}/></span> Overview</button>
+      <button class:active={tab === "library"} aria-current={tab === "library" ? "page" : undefined} title="My library" onclick={() => tab = "library"}><span class="nav-icon"><UiIcon name="library" size={19}/></span> My library <span class="nav-count">{games.length}</span></button>
+      <button class:active={tab === "servers"} aria-current={tab === "servers" ? "page" : undefined} title="Server browser" onclick={enterServerBrowser}><span class="nav-icon"><UiIcon name="server" size={19}/></span> Server browser</button>
     </nav>
     <span class="section-label section-spaced">PREFERENCES</span>
     <nav aria-label="Preferences">
-      <button class:active={tab === "fflags"} onclick={() => tab = "fflags"}><span class="nav-icon">✧</span> Fast Flags</button>
-      <button class:active={tab === "settings"} onclick={() => { tab = "settings"; if (!accountStatusLoaded) void loadConnectedAccount(); }}><span class="nav-icon">⚙</span> Settings</button>
+      <button class:active={tab === "fflags"} aria-current={tab === "fflags" ? "page" : undefined} title="Fast Flags" onclick={() => tab = "fflags"}><span class="nav-icon"><UiIcon name="flags" size={19}/></span> Fast Flags</button>
+      <button class:active={tab === "settings"} aria-current={tab === "settings" ? "page" : undefined} title="Settings" onclick={() => { tab = "settings"; if (!accountStatusLoaded) void loadConnectedAccount(); }}><span class="nav-icon"><UiIcon name="settings" size={19}/></span> Settings</button>
     </nav>
     <div class="sidebar-bottom">
       <div class="sidebar-note"><span class="note-indicator"></span><span>Local-first · No account needed</span></div>
@@ -1064,6 +1076,8 @@
       <div class="top-actions"><span class="platform-tag">{platform}</span><span class="alpha-tag">EARLY ACCESS</span></div>
     </header>
     <div class="content">
+      {#key tab}
+        <div class="tab-scene" in:fly={{ y: liteMode || reducedMotion ? 0 : 16, duration: liteMode || reducedMotion ? 0 : 260, opacity: 0.85, easing: cubicOut }}>
       {#if tab === "home"}
         <div class="hero">
           <div class="hero-glow"></div>
@@ -1105,7 +1119,7 @@
                   <span class="quick-game-title">{item.name}</span>
                   {#if item.isSubplace}<span class="quick-game-label" title={item.parentName}>SUBPLACE · {item.parentName}</span>{/if}
                 </button>
-                <button class="quick-game-server" title={"Browse " + item.name + " servers"} aria-label={"Browse " + item.name + " servers"} onclick={() => { selectGame(item.parentPlaceId); goToServers(item.placeId); }}>◎</button>
+                <button class="quick-game-server" title={"Browse " + item.name + " servers"} aria-label={"Browse " + item.name + " servers"} onclick={() => { selectGame(item.parentPlaceId); goToServers(item.placeId); }}><UiIcon name="server" size={15}/></button>
               </div>
             {/each}
           </div>
@@ -1131,9 +1145,9 @@
         {/if}
         <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>Your workspace</h2></div></div>
         <div class="feature-grid">
-          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "library"}><div class="feature-symbol">▦</div><h3>Game library</h3><p>Save experiences and individual subplaces. No account required.</p><span class="feature-link">Explore library ↗</span></button>
-          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={enterServerBrowser}><div class="feature-symbol">◎</div><h3>Public servers</h3><p>Browse server population, temporary regions and Roblox-reported ping.</p><span class="feature-link">Browse servers ↗</span></button>
-          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "settings"}><div class="feature-symbol">⚙</div><h3>Personalize</h3><p>Switch to Lite Mode and keep resource usage predictable.</p><span class="feature-link">Your settings ↗</span></button>
+          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "library"}><div class="feature-symbol"><UiIcon name="library" size={23}/></div><h3>Game library</h3><p>Save experiences and individual subplaces. No account required.</p><span class="feature-link">Explore library ↗</span></button>
+          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={enterServerBrowser}><div class="feature-symbol"><UiIcon name="server" size={23}/></div><h3>Public servers</h3><p>Browse server population, temporary regions and Roblox-reported ping.</p><span class="feature-link">Browse servers ↗</span></button>
+          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "settings"}><div class="feature-symbol"><UiIcon name="settings" size={23}/></div><h3>Personalize</h3><p>Switch to Lite Mode and keep resource usage predictable.</p><span class="feature-link">Your settings ↗</span></button>
         </div>
       {:else if tab === "library"}
         <div class="page-title"><div><span class="eyebrow">YOUR COLLECTION</span><h1>Game library</h1><p>Bookmark experiences and their individual Roblox places.</p></div><span class="count-badge">{games.length} SAVED</span></div>
@@ -1327,6 +1341,20 @@
             {#if bulkPreviewError}<span class="preview-error">Avatar preview issue: {bulkPreviewError}</span>{/if}
           </div>
           <div class="table-head"><span>SERVER</span><span>REGION</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
+          {#if loading && servers.length === 0}
+            <div class="server-loading" role="status" aria-label="Loading Roblox servers">
+              {#each [0,1,2,3,4] as n (n)}
+                <div class="server-skeleton-row" aria-hidden="true">
+                  <span class="skeleton-block skeleton-id"></span>
+                  <span class="skeleton-block skeleton-region"></span>
+                  <span class="skeleton-block skeleton-players"></span>
+                  <span class="skeleton-block skeleton-ping"></span>
+                  <span class="skeleton-block skeleton-actions"></span>
+                </div>
+              {/each}
+              <span class="sr-only">Loading public servers from Roblox…</span>
+            </div>
+          {/if}
           {#each visibleServers as server (server.id)}
             <div class="server-row">
               <span class="server-id"><span class="online-dot"></span><button class="server-id-copy" title={"Copy server ID: " + server.id} aria-label={"Copy server ID " + server.id} onclick={() => copyServerId(server.id)}>{server.id.slice(0, 8)}… <span aria-hidden="true">⧉</span></button></span>
@@ -1400,10 +1428,17 @@
               </div>
             {/if}
           {:else}
-            <div class="empty-state server-empty"><div class="empty-mark">◎</div>
+            {#if !loading}
+            <div class="empty-state server-empty"><div class="empty-mark"><UiIcon name="server" size={25}/></div>
               <strong>{servers.length ? "No loaded servers match these filters" : "No server data loaded"}</strong>
               <p>{servers.length ? "Try clearing your filters or load another page." : games.length ? "Select a saved place and click Refresh to fetch its public servers." : "Add an experience in your library to browse its servers."}</p>
+              {#if !servers.length}
+                <button class="btn secondary small" onclick={games.length ? (() => loadServers(false)) : (() => tab = "library")}>
+                  {games.length ? "Refresh servers" : "Open game library"}
+                </button>
+              {/if}
             </div>
+            {/if}
           {/each}
           {#if fetchedAt}
             <div class="server-footer"><span>Last refreshed: {fetchedAt.toLocaleTimeString()} · {servers.length} loaded</span>
@@ -1491,6 +1526,8 @@
           <section class="panel settings-panel"><div><h3>Early development</h3><p>Thirst Alpha 0.4 (Fast Flags, portable library and experimental authentication). Test with a separate, low-value Roblox account before using your main account.</p></div><span class="settings-icon">◈</span></section>
         </div>
       {/if}
+        </div>
+      {/key}
       <footer class="app-footer"><span>THIRST / OPEN SOURCE PROJECT</span><span>BUILT TO STAY OUT OF YOUR GAME'S WAY.</span></footer>
     </div>
   </main>
