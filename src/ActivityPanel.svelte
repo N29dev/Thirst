@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fetchPublicServers, recentPlayerSessions } from "./lib/backend";
+  import { fetchPublicServers, lookupGame, recentPlayerSessions } from "./lib/backend";
   import {
-    activityDuration, activityIcon, clearActivityHistory, historyEnabled,
+    activityDuration, activityIcon, addActivityMetadata, clearActivityHistory, historyEnabled,
     mergeObservedSessions, readActivityHistory, setHistoryEnabled,
     shortActivityTime, trackingSince
   } from "./lib/activity";
@@ -16,6 +16,7 @@
   let entries: ActivityEntry[] = [];
   let scanning = false;
   let rejoining = false;
+  let resolvingPlaceId: number | null = null;
   let lastRejoinCheck = 0;
   let message = "";
   let error = "";
@@ -74,6 +75,22 @@
       message = "Local game history cleared. Previously recorded joins will not be reimported.";
     } catch {
       error = "Could not clear game history.";
+    }
+  }
+
+  async function resolveDetails(placeId: number) {
+    if (resolvingPlaceId !== null) return;
+    resolvingPlaceId = placeId;
+    error = "";
+    try {
+      // Explicit user action, not background metadata polling.
+      const metadata = await lookupGame(placeId);
+      entries = addActivityMetadata(entries, placeId, metadata);
+      message = "Game title and artwork updated from Roblox.";
+    } catch (reason) {
+      error = "Couldn't find public details for that place: " + String(reason);
+    } finally {
+      resolvingPlaceId = null;
     }
   }
 
@@ -154,8 +171,8 @@
       {#each entries.slice(0,8) as entry (entry.placeId + ":" + entry.joinedAt + ":" + entry.serverId)}
         <div class="activity-card">
           <div class="activity-cover">
-            {#if activityIcon(games,entry.placeId)}
-              <img src={activityIcon(games,entry.placeId) ?? ""} alt="" loading="lazy"/>
+            {#if entry.iconUrl || activityIcon(games,entry.placeId)}
+              <img src={entry.iconUrl ?? activityIcon(games,entry.placeId) ?? ""} alt="" loading="lazy"/>
             {:else}
               <span class="activity-placeholder">◈</span>
             {/if}
@@ -170,12 +187,16 @@
             <div class="activity-card-actions">
               <button class="btn primary small" disabled={rejoining} onclick={() => void rejoin(entry)}>↺ Rejoin</button>
               <button class="btn secondary small" onclick={() => void onLaunch(entry.placeId,null)}>Open game</button>
+              {#if entry.name.startsWith("Place ")}
+                <button class="btn secondary small" disabled={resolvingPlaceId !== null}
+                  onclick={() => void resolveDetails(entry.placeId)}>{resolvingPlaceId === entry.placeId ? "Loading…" : "Get title & art"}</button>
+              {/if}
             </div>
           </div>
         </div>
       {/each}
     </div>
-    <p class="activity-footnote">Player logs indicate a join attempt, not a guaranteed completed session. Exact-server rejoin checks up to 3 public server pages, then falls back to the place. History keeps at most 80 entries for 30 days.</p>
+    <p class="activity-footnote">Click Get title & art to fetch optional public Roblox metadata. Player logs indicate a join attempt, not a guaranteed completed session. Exact-server rejoin checks up to 3 public server pages, then falls back to the place. History keeps at most 80 entries for 30 days.</p>
   {:else}
     <div class="activity-empty">
       <span>◌</span>
