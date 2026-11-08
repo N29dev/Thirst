@@ -13,6 +13,9 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 - Save and launch individual subplaces under an experience, or discover publicly listed places on demand (with pagination).
 - Quickly launch saved experiences **and individually pinned subplaces** directly from the Overview grid (up to 24 tiles). Use the star next to a saved subplace to pin/unpin it; the tile's server button goes straight to that subplace's public servers.
 - Fetch public Roblox servers on demand with player counts, Roblox-reported ping, pagination, and instance-specific launch links. Server FPS is deliberately omitted from the browser because it does not predict a player's game FPS.
+- Sort and filter **loaded public servers** (player count, free slots, reported ping and saved-only), with search by job UUID.
+- Save public server UUIDs locally for easy rejoin attempts. A saved UUID is **not** guaranteed live; Roblox may shut down/recreate the instance.
+- Expand a server to request **up to five anonymous avatar thumbnails on demand**. The public tokens used for this are retained for at most five minutes in native Rust memory; only validated image URLs reach the frontend. Roblox can omit those tokens or refuse thumbnails.
 - Launch Roblox using its registered desktop deep-link protocol on macOS or Windows.
 - Keep bookmarks and preferences locally. No Thirst account, telemetry, or background polling.
 - Optional **AppleBlox-style** Roblox session login: a 15-second Rust consent gate; on macOS, a separate **Swift/WKWebView helper** with non-persistent storage, automatic native cookie detection and a temporary Keychain entry; on Windows, an isolated Tauri webview. Native code verifies the cookie with Roblox before storing the primary credential. On macOS the app automatically finishes once the helper closes successfully; manual Finish remains available as a fallback. No cookie is returned to Svelte.
@@ -66,7 +69,7 @@ Thirst minimizes unnecessary approvals by tracking native login completion throu
 
 See [docs/SECURITY.md](docs/SECURITY.md) before trying to log in. The experimental native login **does read a Roblox session cookie** from its isolated official-login webview after explicit consent. A stolen cookie can compromise your Roblox account. The credential is stored using OS secure storage but no implementation can guarantee it cannot be stolen. Use a dedicated test account, do not publish or paste any cookie, and revoke testing sessions on Roblox afterwards.
 
-Roblox's public experience and subplace endpoints can fail, be restricted, or return incomplete pages; manual bookmarks still work. Icons are loaded only from Roblox CDN hosts. There is no background game-metadata polling. The Roblox public server API may be unavailable, rate-limited, or return incomplete pages. Displayed ping is Roblox's server metric, not an estimate of the user's own latency. Roblox must be installed and registered to handle deep links.
+Server sorting/filtering applies to fetched pages only, not all active servers. **Regions show Unknown**, not guessed values. Preview avatars have no usernames and only appear when Roblox provides public preview data. Roblox's public experience and subplace endpoints can fail, be restricted, or return incomplete pages; manual bookmarks still work. Icons are loaded only from Roblox CDN hosts. There is no background game-metadata polling. The Roblox public server API may be unavailable, rate-limited, or return incomplete pages. Displayed ping is Roblox's server metric, not an estimate of the user's own latency. Roblox must be installed and registered to handle deep links.
 
 ## Structure
 

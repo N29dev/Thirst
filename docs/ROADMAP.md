@@ -34,10 +34,11 @@ This document tracks features requested during the first successful macOS alpha 
 
 - [ ] Region/provider architecture. Default to **Unknown** unless data is verified; don't confuse Roblox-reported server ping with the local user's latency.
 - [ ] Investigate allowed RoValra integration or licensed provider access; don't scrape or redistribute service data without permission.
-- [ ] Optional initial ~5 player avatar thumbnails **when** a public Roblox token/thumbnail API supports it. This should not attempt to identify players from tokens.
+- [x] On-demand previews of **up to five anonymous player avatars**, when Roblox includes public player tokens. Native Rust holds tokens in a short-lived bounded cache; the UI receives only checked CDN image URLs, never user IDs.
 - [ ] Opt-in friends-in-server indicator, **only when** authorized presence data is accessible and players' Roblox visibility settings permit it.
-- [ ] Filters for region (with source/confidence), free slots, ping, version, and recent/favorite servers. Keep server FPS out of the default list; it does not represent player FPS.
-- [ ] Use caching, pagination, throttling and timeouts to prevent unnecessary rate limiting.
+- [x] Filter/sort loaded servers by free slots, player counts, reported ping, saved-only, and job-ID search. Save individual server UUIDs locally with clear stale-server caveats. Region filtering and server-version metadata remain planned.
+- [ ] Add a verified region/provider architecture with source/confidence and optional server-version filters; never guess region from ping.
+- [ ] Improve rate-limit handling, pagination, caching and timeout behavior for public server discovery. Avatar previews are already opt-in with a 5-minute bounded native token cache.
 
 ## Alpha 0.5+ — Wider feature parity
 

@@ -35,6 +35,7 @@ Roblox warns users not to disclose their cookies and may change cookie formats/r
 
 - Native launch builds `roblox://experiences/start` from validated numeric place IDs and optional UUID server IDs; user input cannot become arbitrary shell commands.
 - On-demand Roblox public requests use fixed HTTPS hosts with redirects disabled.
+- Server avatars are opt-in. The public `playerTokens` array is excluded from Tauri IPC serialization and held for at most five minutes in bounded native RAM. Only up to five validated Roblox CDN image URLs per server are returned to Svelte. The additional public thumbnail request uses only the fixed `https://thumbnails.roblox.com/v1/batch` host and **never includes a Roblox session cookie**. The app does not look up or infer the players' identities.
 - Game icon URLs are accepted only from Roblox's CDN suffix `rbxcdn.com` and constrained by Content Security Policy.
 - Saved games and Lite Mode use localStorage exclusively for nonsensitive metadata.
 
