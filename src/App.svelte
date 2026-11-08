@@ -672,9 +672,12 @@
     if (!rovalraEnabled || rovalraLoading || !activePlaceId || !servers.length) return;
     const placeId = activePlaceId;
     const now = Date.now();
+    // Direct-only results have not been saved into Glutony D1. Allow a
+    // manual retry so they can become shared when the Worker becomes ready.
     const unresolved = servers.map(server => server.id)
       .filter(isValidServerId)
-      .filter(id => !providerRegions[id.toLowerCase()]);
+      .filter(id => !providerRegions[id.toLowerCase()] ||
+        providerRegions[id.toLowerCase()].via === "direct");
     const ids = unresolved
       // A missing region can be retried after one minute. Previously,
       // every checked UUID was permanently excluded until full Refresh.
@@ -685,10 +688,10 @@
         const wait = Math.max(1, Math.ceil(Math.min(...unresolved.map(id =>
           60_000 - (now - (rovalraLastCheckedAt[id.toLowerCase()] ?? 0))
         )) / 1000));
-        notice("Missing server regions may be retried in " + wait +
+        notice("Unknown or direct-only regions may be retried in " + wait +
           "s. RoValra may not have a location for some servers yet.");
       } else {
-        notice("Every loaded server has a region. Load more Roblox servers to check others.");
+        notice("Every loaded server has a shared Glutony region. Load more Roblox servers to check others.");
       }
       return;
     }
@@ -710,10 +713,12 @@
         ...Object.fromEntries(ids.map(id => [id.toLowerCase(), Date.now()]))
       };
       const shared = response.filter(item => item.via === "glutony").length;
+      const direct = response.filter(item => item.via === "direct").length;
       const unknown = ids.length - Object.keys(byId).length;
       notice("Found regions for " + Object.keys(byId).length + " of " + ids.length +
-        " checked servers" + (shared ? " (" + shared + " via Glutony)" : "") +
-        (unknown ? ". " + unknown + " unknown; use Look up regions again after one minute." : "."));
+        " checked servers (" + shared + " shared with Glutony, " + direct + " direct-only)" +
+        (direct ? ". Direct-only results are not saved to your BLR website or bot." : "") +
+        (unknown ? " " + unknown + " unknown; retry after one minute." : ""));
     } catch (error) {
       if (rovalraEnabled && activePlaceId === placeId) {
         rovalraError = String(error);
