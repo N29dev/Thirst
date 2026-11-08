@@ -55,6 +55,7 @@
   let rovalraLoading = false;
   let rovalraError = "";
   let providerRegions: Record<string, ProviderRegion> = {};
+  let rovalraCheckedIds = new Set<string>();
   let editingRegionId: string | null = null;
   let regionDraft: RegionCode | "" = "";
   let serverLoadError = "";
@@ -478,6 +479,7 @@
     editingRegionId = null;
     regionDraft = "";
     providerRegions = {};
+    rovalraCheckedIds = new Set<string>();
     rovalraError = "";
     expandedPreviewId = null;
     previewLoadingId = null;
@@ -531,6 +533,7 @@
     editingRegionId = null;
     regionDraft = "";
     providerRegions = {};
+    rovalraCheckedIds = new Set<string>();
     rovalraError = "";
     expandedPreviewId = null;
     previewLoadingId = null;
@@ -561,6 +564,7 @@
     rovalraEnabled = enabled;
     rovalraError = "";
     providerRegions = {};
+    rovalraCheckedIds = new Set<string>();
     if (enabled) {
       notice("RoValra API enabled for this run. Only public place and server IDs are shared. No cookies.");
       if (activePlaceId && servers.length && !rovalraLoading) void loadRoValraRegions();
@@ -572,8 +576,14 @@
   async function loadRoValraRegions() {
     if (!rovalraEnabled || rovalraLoading || !activePlaceId || !servers.length) return;
     const placeId = activePlaceId;
-    const ids = servers.slice(0, 25).map(server => server.id).filter(isValidServerId);
-    if (!ids.length) return;
+    const ids = servers.map(server => server.id)
+      .filter(isValidServerId)
+      .filter(id => !rovalraCheckedIds.has(id.toLowerCase()))
+      .slice(0, 25);
+    if (!ids.length) {
+      notice("All currently loaded servers have been checked with RoValra. Load more Roblox servers to check others.");
+      return;
+    }
     rovalraLoading = true;
     rovalraError = "";
     try {
@@ -586,7 +596,8 @@
         if (allowed.has(id) && item.source === "rovalra") byId[id] = item;
       }
       providerRegions = { ...providerRegions, ...byId };
-      notice("RoValra reported regions for " + Object.keys(byId).length + " loaded servers.");
+      rovalraCheckedIds = new Set([...rovalraCheckedIds, ...ids.map(id => id.toLowerCase())]);
+      notice("RoValra reported regions for " + Object.keys(byId).length + " of " + ids.length + " checked servers.");
     } catch (error) {
       if (rovalraEnabled && activePlaceId === placeId) {
         rovalraError = String(error);
@@ -683,6 +694,7 @@
         avatarPreviews = {};
         avatarErrors = {};
         providerRegions = {};
+        rovalraCheckedIds = new Set<string>();
         rovalraError = "";
         bulkPreviewVersion++;
         bulkPreviewRequested = [];
@@ -1061,7 +1073,7 @@
             
           </div>
           <div class="server-result-note">
-            <span>{visibleServers.length} shown / {servers.length} loaded · {servers.filter(server => !!regionReportFor(server.id)).length} local reports · {Object.keys(providerRegions).length} RoValra results</span>
+            <span>{visibleServers.length} shown / {servers.length} loaded · {servers.filter(server => !!regionReportFor(server.id)).length} local reports · {Object.keys(providerRegions).length} RoValra results / {rovalraCheckedIds.size} checked</span>
             <button class="link-button" onclick={() => { serverSort = "default"; serverMaxPing = "any"; serverHideFull = false; serverSearch = ""; regionFilter = "any"; }}>Clear filters</button>
             {#if serverLoadError}<span class="server-error">Last request failed: {serverLoadError}</span>{/if}
             {#if rovalraError}<span class="server-error">RoValra: {rovalraError}</span>{/if}
