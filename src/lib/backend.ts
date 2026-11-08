@@ -1,6 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { GameMetadata, ServerPage, SubplacesPage } from "./types";
 
+import type { PlayerSession } from "./activity";
+
+export function recentPlayerSessions(sinceMs: number): Promise<PlayerSession[]> {
+  return invoke<PlayerSession[]>("recent_player_sessions", { sinceMs });
+}
+
 export function launchPlace(placeId: number, jobId: string | null = null): Promise<void> {
   return invoke<void>("launch_place", { placeId, jobId });
 }
