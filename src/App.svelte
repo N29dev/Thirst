@@ -1443,7 +1443,7 @@
               <span class="server-ping">{server.ping === null ? "Not reported" : Math.round(server.ping) + " ms"}<small>Server reported</small></span>
               <div class="server-actions">
                 <button class:active={expandedPreviewId === server.id} class="server-preview-button" aria-expanded={expandedPreviewId === server.id} disabled={previewLoadingId !== null && previewLoadingId !== server.id} title="Show up to five anonymous player avatars" onclick={() => toggleServerPreview(server.id)}><UiIcon name="library" size={14}/>{expandedPreviewId === server.id ? "Hide players" : "Avatars"}</button>
-                <button class="btn small primary" disabled={server.playing >= server.maxPlayers} title={server.playing >= server.maxPlayers ? "Server is full in the last public sample" : "Launch this public instance"} onclick={() => activePlaceId && play(activePlaceId, server.id)}> {server.playing >= server.maxPlayers ? "Full" : "Join"} <UiIcon name="arrow-up-right" size={14}/></button>
+                <button class="btn small primary" title={server.playing >= server.maxPlayers ? "This server was full at the last refresh, but may have space now" : "Launch this public instance"} onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join <UiIcon name="arrow-up-right" size={14}/></button>
               </div>
             </div>
             {#if editingRegionId === server.id}
