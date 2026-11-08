@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
+  import { historyEnabled, readActivityHistory, recordLaunchAttempt } from "./lib/activity";
   import {readRecentLaunches, recordRecentLaunch, clearRecentLaunches, recentPlaceName} from "./lib/recent";
   import type {RecentLaunch} from "./lib/recent";
   import {exportLibraryJson, importLibraryJson, mergeImportedLibrary} from "./lib/library-backup";
@@ -789,6 +790,10 @@
       await launchPlace(placeId, jobId);
       try {
         recentLaunches = recordRecentLaunch(placeId, recentPlaceName(games,placeId));
+        // Label this separately as a launch request. A later Roblox Player
+        // log observation replaces a matching request, if one is available.
+        if (historyEnabled()) recordLaunchAttempt(
+          readActivityHistory(), placeId, games, jobId);
       } catch {
         // History never prevents starting Roblox.
       }
