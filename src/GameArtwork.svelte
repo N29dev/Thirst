@@ -9,8 +9,6 @@
   let failed = false;
   let previousUrl: string | null = null;
 
-  // Reuse the existing public Roblox CDN allowlist. Never construct an image
-  // URL or load artwork from user-supplied domains.
   $: safeUrl = isTrustedIconUrl(src) ? src : null;
   $: if (safeUrl !== previousUrl) {
     previousUrl = safeUrl;
@@ -19,33 +17,66 @@
   $: fallback = (name.trim().charAt(0) || "?").toUpperCase();
 </script>
 
-<div class="game-art" class:missing={!safeUrl || failed} class:cover={variant === "cover"} class:tile={variant === "tile"} class:hero={variant === "hero"} aria-hidden="true">
-  <div class="art-fallback"><span>{fallback}</span></div>
+<!-- Explicit square grid sizing avoids a WebKit layout issue with nested
+     height:100% and absolutely positioned images inside aspect-ratio boxes.
+     The placeholder stays underneath the image, not in a different layer. -->
+<div class="game-art" class:tile={variant === "tile"} aria-hidden="true">
+  <span class="art-fallback">{fallback}</span>
   {#if safeUrl && !failed}
     {#key safeUrl}
-      <img src={safeUrl} alt="" loading={eager ? "eager" : "lazy"} decoding="async"
-        onerror={() => { failed = true; }} />
+      <img
+        src={safeUrl}
+        alt=""
+        width="512"
+        height="512"
+        loading={eager ? "eager" : "lazy"}
+        decoding="async"
+        draggable="false"
+        onerror={() => { failed = true; }}
+      />
     {/key}
   {/if}
-  <span class="art-sheen"></span>
 </div>
 
 <style>
-  .game-art{position:relative;display:block;width:100%;height:100%;min-width:0;overflow:hidden;isolation:isolate;background:#1d3951}
-  .art-fallback{position:absolute;inset:0;display:grid;place-items:center;
-    background:radial-gradient(circle at 32% 24%,#406a86 0%,#1f405d 46%,#172c45 100%);
-    color:#b9ecf8}
-  .art-fallback::before{content:"";position:absolute;inset:-35%;
-    border:1px solid #b8eaf521;border-radius:38%;transform:rotate(-24deg)}
-  .art-fallback span{font-size:clamp(28px,5vw,72px);font-weight:850;line-height:1;letter-spacing:-4px;opacity:.7}
-  .tile .art-fallback span{font-size:27px;letter-spacing:-2px;opacity:.75}
-  .hero .art-fallback span{font-size:78px}
-  img{position:absolute;inset:0;display:block;width:100%;height:100%;
-    object-fit:contain;object-position:center;background:#163249;
-    opacity:1;transform:none}
-  .art-sheen{position:absolute;inset:0;pointer-events:none;background:linear-gradient(160deg,#fff8 0%,transparent 32%,#050d1a2b 100%);opacity:.14}
-  .cover .art-sheen{opacity:.30}
-  .hero .art-sheen{opacity:.2}
-  @media(prefers-reduced-motion:reduce){img{transition:none;transform:none}}
-  :global(.lite) img{transition:none!important;transform:none!important}
+  .game-art {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    background: #213b51;
+  }
+  .art-fallback, img {
+    grid-column: 1;
+    grid-row: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+  }
+  .art-fallback {
+    display: grid;
+    place-items: center;
+    background: linear-gradient(145deg, #315b73, #1d344a);
+    color: #e0f7fb;
+    font-size: 42px;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .tile .art-fallback { font-size: 23px; }
+  img {
+    z-index: 1;
+    object-fit: cover;
+    object-position: center;
+    max-width: 100%;
+    max-height: 100%;
+    border: 0;
+    border-radius: inherit;
+  }
 </style>
