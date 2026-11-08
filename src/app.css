@@ -950,3 +950,19 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   .subplace-row{flex-wrap:wrap;align-items:flex-start}
   .subplace-row .row-actions{width:100%;justify-content:flex-start}
 }
+
+
+/* Quickplay v2: one high-quality compact game identity per experience;
+   pinned places use text-first actions instead of duplicate blown-up icons. */
+.favorite-collection-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,510px),1fr));
+  gap:18px;
+  align-items:start;
+  margin:18px 0 38px;
+  min-width:0;
+}
+.favorite-collection-grid > *{min-width:0}
+@media(max-width:760px){
+  .favorite-collection-grid{grid-template-columns:minmax(0,1fr);gap:13px;margin:14px 0 30px}
+}
