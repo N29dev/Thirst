@@ -327,6 +327,33 @@
     });
   }
 
+  // Reorder saved experiences without changing their IDs, launch settings, or
+  // pinned subplaces. The Overview quick-launch grid uses this exact order.
+  function moveGame(direction: -1 | 1) {
+    if (!selected) return;
+    const from = games.findIndex(game => game.placeId === selected.placeId);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= games.length) return;
+    const ordered = [...games];
+    [ordered[from], ordered[to]] = [ordered[to], ordered[from]];
+    games = ordered;
+    setLibrarySort("saved");
+    persist();
+  }
+
+  function moveSubplace(placeId: number, direction: -1 | 1) {
+    if (!selected) return;
+    const parentId = selected.placeId;
+    const from = selected.subplaces.findIndex(place => place.placeId === placeId);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= selected.subplaces.length) return;
+    const ordered = [...selected.subplaces];
+    [ordered[from], ordered[to]] = [ordered[to], ordered[from]];
+    games = games.map(game => game.placeId === parentId
+      ? { ...game, subplaces: ordered } : game);
+    persist();
+  }
+
   function togglePin(place: SavedPlace) {
     if (!selected) return;
     const parentId = selected.placeId;
@@ -581,7 +608,9 @@
       const link = document.createElement("a");
       link.href = url;
       link.download = "thirst-library.json";
+      document.body.appendChild(link);
       link.click();
+      link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       notice("Library backup exported. Roblox credentials are not included.");
     } catch (error) {
@@ -1077,6 +1106,10 @@
                 <button class="btn primary" onclick={() => play(selected.placeId)}>▶ Play experience</button>
                 <button class="btn secondary" onclick={() => goToServers(selected.placeId)}>◎ Servers</button>
                 <button class="btn secondary" disabled={syncingGame} onclick={syncSelectedGame}>{syncingGame ? "Syncing…" : "↻ Update icon"}</button>
+                {#if games.length > 1}
+                  <button class="btn secondary" title="Move experience up in favorites" aria-label={"Move " + selected.name + " up"} disabled={games[0]?.placeId === selected.placeId} onclick={() => moveGame(-1)}>↑ Move</button>
+                  <button class="btn secondary" title="Move experience down in favorites" aria-label={"Move " + selected.name + " down"} disabled={games[games.length - 1]?.placeId === selected.placeId} onclick={() => moveGame(1)}>↓ Move</button>
+                {/if}
                 <button class="btn danger subtle" onclick={removeGame} aria-label="Remove saved experience">Remove</button>
               </div>
               <div class="sub-header"><h3>Saved subplaces</h3><span>{selected.subplaces.length} PLACES · ☆ PINS TO HOME</span></div>
@@ -1084,6 +1117,10 @@
                 {#each selected.subplaces as place (place.placeId)}
                   <div class="subplace-row"><div><strong>{place.name}</strong><small>Place ID {place.placeId}</small></div>
                     <div class="row-actions">
+                      {#if selected.subplaces.length > 1}
+                        <button title="Move subplace up" aria-label={"Move " + place.name + " up"} disabled={selected.subplaces[0]?.placeId === place.placeId} onclick={() => moveSubplace(place.placeId, -1)}>↑</button>
+                        <button title="Move subplace down" aria-label={"Move " + place.name + " down"} disabled={selected.subplaces[selected.subplaces.length - 1]?.placeId === place.placeId} onclick={() => moveSubplace(place.placeId, 1)}>↓</button>
+                      {/if}
                       <button class:pinned={place.pinned === true} aria-pressed={place.pinned === true} title={place.pinned ? "Unpin from home favorites" : "Pin to home favorites"} aria-label={place.pinned ? "Unpin " + place.name : "Pin " + place.name + " to home"} onclick={() => togglePin(place)}>{place.pinned ? "★" : "☆"}</button>
                       <button title="Launch subplace" aria-label={"Launch " + place.name} onclick={() => play(place.placeId)}>▶</button>
                       <button title="View servers" aria-label={"Browse " + place.name + " servers"} onclick={() => goToServers(place.placeId)}>◎</button>
