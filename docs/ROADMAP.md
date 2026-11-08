@@ -55,8 +55,54 @@ This document tracks features requested during the first successful macOS alpha 
 - [ ] Optional Discord Rich Presence if local game activity can be confirmed. Avoid a duplicate Roblox installer/updater, plugins, or themes without a real user need.
 - [ ] Multi-instance and multi-account options only when stable and compliant.
 - [ ] Plugin API with narrowly scoped permissions and no credential access.
-- [x] Unsigned test-app packaging automation for macOS ARM64 and Windows, with the native macOS login helper in the bundled resources.
+- [x] Automated test-app packaging for macOS ARM64 and Windows; macOS app and native login helper are ad-hoc signed and signature-checked, but **not Developer ID signed or notarized**.
 - [ ] Real-device smoke tests, startup/idle CPU+RAM benchmarks, verified code signing and notarized public releases.
+
+## AppleBlox 0.9.0 feature study — Nov 8, 2026
+
+Reference: [AppleBlox source](https://github.com/AppleBlox/appleblox), [0.9.0 changelog](https://github.com/AppleBlox/appleblox/blob/main/CHANGELOG_0.9.0.md), and the user's screenshots of Quickplay, Account, Integrations, Behavior, Engine, Mods, Appearance and Misc. These items are **ideas for independent implementation, not a port or a promise that all AppleBlox features work on current Roblox**. AppleBlox is GPL-3.0; Thirst is MIT. Do not copy its source, artwork, assets or bundled helpers into Thirst without resolving licensing obligations.
+
+### Already covered in Thirst (do not build twice)
+
+- [x] Basic Quickplay: saved experience/subplace tiles with verified Roblox icons and manual launches. Recent **launcher-initiated place** shortcuts already exist; these are **not** automatic play history.
+- [x] Local library, ordering, pinned subplaces, portable library backups, and on-demand public server pages.
+- [x] Native login to an official Roblox page with one connected account, Keychain/Credential Manager storage and explicit consent. **Not** multi-account management or automatic Roblox-cookie extraction.
+- [x] Basic Fast Flags presets, search, allowlisted editing, named JSON import/export, disabled-flag handling, and first-overwrite backup. This does **not** make unsupported old FFlags work.
+- [x] Manually refreshed, attributed region data via RoValra/Glutony and local region reports; server-reported ping is **not** a user's measured latency.
+- [x] Desktop notifications and a local-first Lite Mode. Test-bundle workflow exists; public signing/notarization remains separate.
+
+### P0 — Next: high-value quality of life, little runtime overhead
+
+- [ ] **Real recent-game history.** Add an optional, local-only Roblox session observer that records game identity, joined time, approximate duration and last-seen instance, with a small bounded database. Start disabled until consent; no full-time remote polling or cookie use. Show attractive cover-art Quickplay tiles and a history view; retain the existing manual/pinned library independently. Provide pause, clear, retention limits and fallback when log data is missing. _Done when_: it detects actual sessions not launched through Thirst, remains idle after Roblox exits, and never mislabels manually saved games as recently played.
+- [ ] **Rejoin last game / last server.** A prominent Rejoin action should try the most recent *validated live* instance where the official launch flow allows, show when the instance has expired/full/private, and fall back clearly to launching the place. Do not blindly replay an old UUID or claim the exact server still exists. _Done when_: working rejoin and expired-server fallback are tested in macOS and Windows.
+- [ ] **Roblox installation detection and repair UX.** Show detected official Roblox.app/Player location, install/version status and registered URL handler. Offer Re-detect, a manually chosen/validated installation path, open installation folder and a link to the **official Roblox installer** when absent. Do not add a second automatic updater or overwrite an installation without a demonstrated need. _Done when_: default and nonstandard installs, missing handlers and an uninstalled Roblox state all display actionable errors on both platforms.
+- [ ] **Useful diagnostics.** Add bounded, locally stored structured launcher logs with rigorous credential/cookie/URL-token redaction; a readable Copy Debug Report and Export Debug Bundle with OS/build, failed operations and recent errors; direct Open Logs / Open App Data buttons. Reports must omit secrets and private player data by construction. _Done when_: a failed login, settings write or server request can be investigated without requesting a screenshot of private credentials.
+- [ ] **Navigation and first-run polish.** Adopt the *clarity*, not the appearance, of AppleBlox's grouped settings. Keep Overview / Library / Servers / Fast Flags prominent; subdivide Settings into Account, Roblox & Launch, Integrations, Appearance, and Troubleshooting without creating empty pages. Add a lightweight first-run install/account explanation, helpful disabled-state descriptions and keyboard shortcuts only for common, visible actions. _Done when_: all screens work at narrow window sizes and do not add heavy idle animation or needless options.
+
+### P1 — After P0: opt-in integrations and power-user functionality
+
+- [ ] **Discord Rich Presence (minimal).** Optional, off by default. Display the validated current game and optionally elapsed play time while Roblox is running. Stop and clear on exit; allow hiding the game. A join button must remain off unless an authorized and privacy-respecting join target can be established. Avoid Bloxstrap SDK emulation or third-party scripts in v1. _Done when_: Discord absent/closed, opt-out, game exit and long idle sessions are handled without launcher slowdown.
+- [ ] **Multiple accounts, native-only.** A deliberate manager for explicitly connected Roblox accounts: avatars/display names, active profile, expired-session warnings, add/switch/disconnect, and separate Keychain/Credential Manager entries. No cookie paste field, automatic scraping of a logged-in Roblox browser, or credentials exposed in Svelte. Require a clear session-switching model and re-test the consent/security boundary. _Done when_: switching does not accidentally launch the prior account, losing one account doesn't erase the other, and macOS Keychain prompts remain understandable.
+- [ ] **Preferred region as a *server-finder preference*.** Prioritize candidates from loaded servers using attributable provider reports and the user's choice; retain Automatic by default. Clearly distinguish provider region, unverified local observation and measured latency; do not promise to force Roblox matchmaking into a region. Respect RoValra's conditions and availability. _Done when_: results re-sort correctly without invented low-ping estimates, and Unknown locations remain accessible.
+- [ ] **Optional game-session details.** For locally observed sessions, display region *only when legitimately known*, approximate duration, and recent place counts. A region-on-join toast can be toggled off. Never export other players' presence or identifiers as part of history.
+- [ ] **Advanced graphics controls within the current allowlist.** Group Fast Flags into readable Graphics / Geometry / Display settings, add clear warning labels for unsupported platforms, effective/ignored values and conflicting rendering backends. Investigate current Roblox behavior before promising AppleBlox's render-resolution, graphics-API or FPS-cap tricks; its Engine source has commented-out render-resolution controls in the reviewed snapshot. _Done when_: any exposed toggle actually affects a supported setting or is explicitly labeled experimental and tested.
+
+### P2 — Optional only when users request it
+
+- [ ] **Appearance personalization for Thirst.** A few built-in color themes/accent choices and a small icon library; use local assets and performance-safe CSS. Do not import arbitrary executable CSS or borrow AppleBlox artwork. App icon customization needs platform-specific packaging behavior.
+- [ ] **Reversible Roblox asset customization.** Research custom fonts, icon recoloring and a local mods manager with previews, size/file counts, enable/disable and robust backups/restores across Roblox updates. First validate whether modifying the signed Roblox installation is supported and does not break updates or client integrity. No patching binaries, anti-cheat evasion, or unsafe remote mod installer.
+- [ ] **Updater/release UX for Thirst itself.** An optional version check, release notes and direct official GitHub release links **after** stable signed distributions exist; never silently replace a running app. A separate Roblox background updater is not a priority.
+- [ ] **Multi-instance exploration.** Research official macOS/Windows restrictions and process ownership. Do not offer a mechanism that patches Roblox to defeat instance limits, modifies signatures or evades anti-cheat. Ship only if there is a supported and reliably tested approach.
+- [ ] **Bootstrapper themes / Bloxstrap theme compatibility.** Consider only after users ask for it and the loader genuinely needs an independent bootstrap window. AppleBlox's XAML theme implementation is a substantial extra surface; not worth cloning simply for parity.
+
+### Explicitly defer / avoid
+
+- Automatic Roblox session-cookie import from another program, manual cookie entry, or relaxing credential isolation just to mimic AppleBlox account setup.
+- Virtual-display FPS unlocking, legacy disallowed Fast Flags, forced datacenter selection, or claims of guaranteed ping reductions. Platform/client compatibility must be proven independently.
+- Full AppleBlox-style background update services, Bloxstrap SDK, arbitrary plugins, a public mod workshop and custom scripting in the first public Thirst release. They introduce ongoing work and risk without improving the core launch/server experience.
+- Copying AppleBlox's GPL-3.0 implementation/UI assets into MIT Thirst. Use the screenshots to study information architecture and feature scope only, then write independent Tauri/Rust/Svelte code.
+
+**Suggested order:** P0 history → rejoin → installation detection → diagnostics → navigation; then P1 Rich Presence → region preference → account switching. Keep real-device macOS/Windows tests, provider terms and Developer ID signing/notarization as parallel release blockers rather than claiming a polished UI means a public-ready launcher.
 
 ## Design principles
 
