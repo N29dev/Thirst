@@ -171,6 +171,15 @@
           : [])
       ]
     : [];
+  // Frequently used destinations are selectable without drilling into the
+  // full place dropdown. Switching place does NOT make a network request.
+  $: quickServerPlaces = selected
+    ? availablePlaces.filter(place =>
+      place.placeId === selected.placeId ||
+      place.placeId === activePlaceId ||
+      selected.subplaces.some(sub => sub.placeId === place.placeId && sub.pinned === true)
+    ).slice(0, 10)
+    : [];
 
   onMount(() => {
     reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1331,6 +1340,22 @@
             </select>
             <button class="btn primary" disabled={!activePlaceId || loading} onclick={() => loadServers(false)}>{loading ? "Loading…" : "↻ Refresh"}</button>
           </div>
+          {#if selected && quickServerPlaces.length > 1}
+            <div class="server-place-shortcuts">
+              <span class="server-shortcut-label">QUICK PLACES</span>
+              <div class="server-shortcut-items">
+                {#each quickServerPlaces as place (place.placeId)}
+                  <button class:active={activePlaceId === place.placeId} aria-pressed={activePlaceId === place.placeId}
+                    title={"Select " + place.name + " — then refresh to load its servers"}
+                    onclick={() => changeActivePlace(place.placeId)}>
+                    {#if place.placeId === selected.placeId}<UiIcon name="home" size={13}/>{:else}<UiIcon name="play" size={12}/>{/if}
+                    <span>{place.name}</span>
+                  </button>
+                {/each}
+              </div>
+              <span class="server-shortcut-hint">Choose, then Refresh</span>
+            </div>
+          {/if}
           <div class="rovalra-toolbar">
             <label class="server-checkbox" title="RoValra region lookups are on by default. Turn this off to stop sharing public place/server IDs with this third-party provider; your preference is remembered. No Roblox cookie is shared.">
               <input type="checkbox" checked={rovalraEnabled} onchange={e => setRoValraEnabled(e.currentTarget.checked)} />
