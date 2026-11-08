@@ -10,6 +10,14 @@
   import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
 
   type Tab = "home" | "library" | "servers" | "settings";
+  type QuickLaunchItem = {
+    placeId: number;
+    parentPlaceId: number;
+    name: string;
+    parentName: string;
+    iconUrl?: string;
+    isSubplace: boolean;
+  };
   let tab: Tab = "home";
   let games: SavedGame[] = [];
   let selectedId: number | null = null;
@@ -49,10 +57,24 @@
   let consentTimer: ReturnType<typeof setInterval> | undefined;
   let nativeLoginTimer: ReturnType<typeof setInterval> | undefined;
   let nativeLoginCheckInProgress = false;
+  let hoverFrame = 0;
+  let hoverPending: { target: HTMLElement; x: number; y: number } | null = null;
 
   $: selected = games.find(game => game.placeId === selectedId) || null;
   $: filteredGames = games.filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
     String(game.placeId).includes(filter));
+  $: quickLaunchItems = games.flatMap((game): QuickLaunchItem[] => [
+    {
+      placeId: game.placeId, parentPlaceId: game.placeId,
+      name: game.name, parentName: game.name,
+      iconUrl: game.iconUrl, isSubplace: false
+    },
+    ...game.subplaces.filter(place => place.pinned === true).map((place): QuickLaunchItem => ({
+      placeId: place.placeId, parentPlaceId: game.placeId,
+      name: place.name, parentName: game.name,
+      iconUrl: game.iconUrl, isSubplace: true
+    }))
+  ]).slice(0, 24);
   $: availablePlaces = selected
     ? [
         { placeId: selected.placeId, name: "Main place" },
@@ -75,6 +97,7 @@
       if (toastTimeout) clearTimeout(toastTimeout);
       if (consentTimer) clearInterval(consentTimer);
       if (nativeLoginTimer) clearInterval(nativeLoginTimer);
+      if (hoverFrame) cancelAnimationFrame(hoverFrame);
     };
   });
 
@@ -207,6 +230,38 @@
     } finally {
       loginBusy = false;
     }
+  }
+
+  function moveHoverLight(event: PointerEvent) {
+    // Work occurs only while the pointer moves, at most once per animation frame.
+    if (liteMode || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) return;
+    const bounds = target.getBoundingClientRect();
+    hoverPending = { target, x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    if (hoverFrame) return;
+    hoverFrame = requestAnimationFrame(() => {
+      if (hoverPending) {
+        hoverPending.target.style.setProperty("--glow-x", hoverPending.x + "px");
+        hoverPending.target.style.setProperty("--glow-y", hoverPending.y + "px");
+        hoverPending = null;
+      }
+      hoverFrame = 0;
+    });
+  }
+
+  function togglePin(place: SavedPlace) {
+    if (!selected) return;
+    const parentId = selected.placeId;
+    const wasPinned = place.pinned === true;
+    games = games.map(game => game.placeId === parentId ? {
+      ...game,
+      subplaces: game.subplaces.map(item =>
+        item.placeId === place.placeId ? { ...item, pinned: !wasPinned } : item
+      )
+    } : game);
+    persist();
+    notice(wasPinned ? "Subplace removed from home favorites." : "Subplace pinned to home favorites.");
   }
 
   function hideBrokenIcon(event: Event) {
@@ -489,31 +544,35 @@
           <div class="hero-art" aria-hidden="true"><div class="orb orb-outer"><div class="orb orb-inner">T</div></div></div>
         </div>
         <div class="stats">
-          <div class="stat"><small>SAVED EXPERIENCES</small><strong>{games.length.toString().padStart(2, "0")}</strong><span>In your personal library</span></div>
-          <div class="stat"><small>BOOKMARKED SUBPLACES</small><strong>{games.reduce((n, g) => n + g.subplaces.length, 0).toString().padStart(2, "0")}</strong><span>Quick launch shortcuts</span></div>
-          <div class="stat"><small>BACKGROUND REFRESH</small><strong>OFF</strong><span>Servers load only on request</span></div>
+          <div class="stat hover-glow" onpointermove={moveHoverLight}><small>SAVED EXPERIENCES</small><strong>{games.length.toString().padStart(2, "0")}</strong><span>In your personal library</span></div>
+          <div class="stat hover-glow" onpointermove={moveHoverLight}><small>BOOKMARKED SUBPLACES</small><strong>{games.reduce((n, g) => n + g.subplaces.length, 0).toString().padStart(2, "0")}</strong><span>Quick launch shortcuts</span></div>
+          <div class="stat hover-glow" onpointermove={moveHoverLight}><small>BACKGROUND REFRESH</small><strong>OFF</strong><span>Servers load only on request</span></div>
         </div>
-        {#if games.length}
+        {#if quickLaunchItems.length}
           <div class="section-heading"><div><span class="eyebrow">ONE-CLICK LAUNCH</span><h2>Your favorites</h2></div><button class="link-button" onclick={() => tab = "library"}>Manage library ↗</button></div>
           <div class="quick-launch-grid">
-            {#each games.slice(0, 12) as game (game.placeId)}
-              <div class="quick-game">
-                <button class="quick-game-main" onclick={() => play(game.placeId)} title={"Launch " + game.name} aria-label={"Launch " + game.name}>
-                  <span class="game-tile quick-game-icon">{game.name.slice(0, 1).toUpperCase()}
-                    {#if isTrustedIconUrl(game.iconUrl)}<img src={game.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
+            {#each quickLaunchItems as item (`${item.parentPlaceId}:${item.placeId}`)}
+              <div class="quick-game hover-glow" class:subplace={item.isSubplace} onpointermove={moveHoverLight}>
+                <button class="quick-game-main" onclick={() => play(item.placeId)} title={"Launch " + item.name} aria-label={"Launch " + item.name}>
+                  <span class="game-tile quick-game-icon">{item.name.slice(0, 1).toUpperCase()}
+                    {#if isTrustedIconUrl(item.iconUrl)}<img src={item.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
                   </span>
-                  <span class="quick-game-title">{game.name}</span>
+                  <span class="quick-game-title">{item.name}</span>
+                  {#if item.isSubplace}<span class="quick-game-label" title={item.parentName}>SUBPLACE · {item.parentName}</span>{/if}
                 </button>
-                <button class="quick-game-server" title={"Browse " + game.name + " servers"} aria-label={"Browse " + game.name + " servers"} onclick={() => { selectGame(game.placeId); tab = "servers"; }}>◎</button>
+                <button class="quick-game-server" title={"Browse " + item.name + " servers"} aria-label={"Browse " + item.name + " servers"} onclick={() => { selectGame(item.parentPlaceId); goToServers(item.placeId); }}>◎</button>
               </div>
             {/each}
           </div>
+          {#if games.reduce((total, game) => total + 1 + game.subplaces.filter(place => place.pinned).length, 0) > 24}
+            <p class="form-hint">Showing the first 24 shortcuts. Your other saved places remain available in My Library.</p>
+          {/if}
         {/if}
         <div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2>Your workspace</h2></div></div>
         <div class="feature-grid">
-          <button class="feature" onclick={() => tab = "library"}><div class="feature-symbol">▦</div><h3>Game library</h3><p>Save experiences and individual subplaces. No account required.</p><span class="feature-link">Explore library ↗</span></button>
-          <button class="feature" onclick={() => tab = "servers"}><div class="feature-symbol">◎</div><h3>Public servers</h3><p>Browse server population, FPS and Roblox-reported latency.</p><span class="feature-link">Browse servers ↗</span></button>
-          <button class="feature" onclick={() => tab = "settings"}><div class="feature-symbol">⚙</div><h3>Personalize</h3><p>Switch to Lite Mode and keep resource usage predictable.</p><span class="feature-link">Your settings ↗</span></button>
+          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "library"}><div class="feature-symbol">▦</div><h3>Game library</h3><p>Save experiences and individual subplaces. No account required.</p><span class="feature-link">Explore library ↗</span></button>
+          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "servers"}><div class="feature-symbol">◎</div><h3>Public servers</h3><p>Browse server population, FPS and Roblox-reported latency.</p><span class="feature-link">Browse servers ↗</span></button>
+          <button class="feature hover-glow" onpointermove={moveHoverLight} onclick={() => tab = "settings"}><div class="feature-symbol">⚙</div><h3>Personalize</h3><p>Switch to Lite Mode and keep resource usage predictable.</p><span class="feature-link">Your settings ↗</span></button>
         </div>
       {:else if tab === "library"}
         <div class="page-title"><div><span class="eyebrow">YOUR COLLECTION</span><h1>Game library</h1><p>Bookmark experiences and their individual Roblox places.</p></div><span class="count-badge">{games.length} SAVED</span></div>
@@ -558,11 +617,16 @@
                 <button class="btn secondary" disabled={syncingGame} onclick={syncSelectedGame}>{syncingGame ? "Syncing…" : "↻ Update icon"}</button>
                 <button class="btn danger subtle" onclick={removeGame} aria-label="Remove saved experience">Remove</button>
               </div>
-              <div class="sub-header"><h3>Saved subplaces</h3><span>{selected.subplaces.length} PLACES</span></div>
+              <div class="sub-header"><h3>Saved subplaces</h3><span>{selected.subplaces.length} PLACES · ☆ PINS TO HOME</span></div>
               <div class="subplace-list">
                 {#each selected.subplaces as place (place.placeId)}
                   <div class="subplace-row"><div><strong>{place.name}</strong><small>Place ID {place.placeId}</small></div>
-                    <div class="row-actions"><button title="Launch subplace" onclick={() => play(place.placeId)}>▶</button><button title="View servers" onclick={() => goToServers(place.placeId)}>◎</button><button title="Remove subplace" onclick={() => removeSubplace(place)}>×</button></div>
+                    <div class="row-actions">
+                      <button class:pinned={place.pinned === true} aria-pressed={place.pinned === true} title={place.pinned ? "Unpin from home favorites" : "Pin to home favorites"} aria-label={place.pinned ? "Unpin " + place.name : "Pin " + place.name + " to home"} onclick={() => togglePin(place)}>{place.pinned ? "★" : "☆"}</button>
+                      <button title="Launch subplace" aria-label={"Launch " + place.name} onclick={() => play(place.placeId)}>▶</button>
+                      <button title="View servers" aria-label={"Browse " + place.name + " servers"} onclick={() => goToServers(place.placeId)}>◎</button>
+                      <button title="Remove subplace" aria-label={"Remove " + place.name} onclick={() => removeSubplace(place)}>×</button>
+                    </div>
                   </div>
                 {:else}
                   <div class="empty-state"><div class="empty-mark">◇</div><strong>No subplaces yet</strong><p>Save an individual place to launch it or inspect its servers without searching again.</p></div>
