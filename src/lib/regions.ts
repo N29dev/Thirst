@@ -37,6 +37,7 @@ export type ProviderRegion = {
   region: string | null;
   country: string | null;
   source: "rovalra";
+  via?: "glutony" | "direct";
 };
 
 const COUNTRY_GROUPS: Record<RegionCode, string[]> = {

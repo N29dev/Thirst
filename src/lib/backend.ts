@@ -35,6 +35,7 @@ export type ProviderRegion = {
   region: string | null;
   country: string | null;
   source: "rovalra";
+  via?: "glutony" | "direct";
 };
 
 export function lookupRoValraRegions(placeId: number, serverIds: string[]): Promise<ProviderRegion[]> {

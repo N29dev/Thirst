@@ -600,7 +600,9 @@
       }
       providerRegions = { ...providerRegions, ...byId };
       rovalraCheckedIds = new Set([...rovalraCheckedIds, ...ids.map(id => id.toLowerCase())]);
-      notice("RoValra reported regions for " + Object.keys(byId).length + " of " + ids.length + " checked servers.");
+      const shared = response.filter(item => item.via === "glutony").length;
+      notice("Found regions for " + Object.keys(byId).length + " of " + ids.length +
+        " checked servers" + (shared ? " (" + shared + " reused from Glutony)" : "") + ".");
     } catch (error) {
       if (rovalraEnabled && activePlaceId === placeId) {
         rovalraError = String(error);
@@ -1042,7 +1044,7 @@
             <button class="btn secondary small" disabled={!rovalraEnabled || rovalraLoading || !servers.length} onclick={loadRoValraRegions}>
               {rovalraLoading ? "Finding regions…" : "↻ Look up regions"}
             </button>
-            <span class="provider-note">On by default when you refresh servers. RoValra receives public place/server IDs and your request's network IP; never a Roblox cookie. Turn off any time; 30-second lookup cooldown.</span>
+            <span class="provider-note">BLR regions first reuse Glutony's shared Cloudflare cache; unmatched servers may fall back to RoValra directly. Only public place/server IDs are sent, never Roblox cookies or bot tokens. On by default; 30-second cooldown.</span>
             <a class="provider-credit" href="https://www.rovalra.com/" target="_blank" rel="noopener noreferrer">Region data by RoValra ↗</a>
           </div>
           <div class="server-disclaimer">Ping is Roblox's <strong>server-reported value, not your personal latency</strong>. Filters and sorting affect only loaded pages, not every live server. Regions are Unknown until RoValra reports a location or you add a local observation. RoValra lookup is on by default and can be disabled above. RoValra results are provider-reported, not independently verified by Thirst; local observations expire after two hours. Connected users can see automatic anonymous avatar previews for up to eight loaded servers (unless disabled or in Lite Mode).</div>
@@ -1096,7 +1098,7 @@
                 class="server-region-button"
                 class:reported={!!regionReportFor(server.id)}
                 class:provider={!regionReportFor(server.id) && !!providerRegions[server.id.toLowerCase()]}
-                title={regionReportFor(server.id) ? "Your unverified local report · expires after two hours · click to edit" : providerRegions[server.id.toLowerCase()] ? providerRegionLabel(providerRegions[server.id.toLowerCase()]) + " · Source: RoValra (provider-reported, not independently verified) · Click to add your observation" : "Region unknown · click to add your own report after checking in-game"}
+                title={regionReportFor(server.id) ? "Your unverified local report · expires after two hours · click to edit" : providerRegions[server.id.toLowerCase()] ? providerRegionLabel(providerRegions[server.id.toLowerCase()]) + (providerRegions[server.id.toLowerCase()].via === "glutony" ? " · Via Glutony's shared region cache" : " · Direct lookup") + " · Source: RoValra (not independently verified) · Click to add your observation" : "Region unknown · click to add your own report after checking in-game"}
                 aria-label={"Region for server " + server.id + ": " + displayServerRegion(server.id) + ". Edit local report."}
                 onclick={() => editServerRegion(server.id)}
               >
