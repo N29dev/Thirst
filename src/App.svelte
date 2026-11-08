@@ -917,6 +917,9 @@
                   </div>
                 {:else}
                   <span class="preview-status">Roblox did not return any displayable public thumbnails.</span>
+                  {#if connectedAccount && !useAuthenticatedAvatarRequests}
+                    <button class="link-button" onclick={() => tab = "settings"}>Review experimental session-backed avatar requests in Settings</button>
+                  {/if}
                 {/if}
               </div>
             {/if}
