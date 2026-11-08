@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: "22"
       - name: Install icon generator
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
       - name: Generate platform icon assets
         run: npm run icons
       - name: Validate bundled icon pixel data
