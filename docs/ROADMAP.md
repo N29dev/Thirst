@@ -34,11 +34,11 @@ This document tracks features requested during the first successful macOS alpha 
 
 - [ ] Region/provider architecture. Default to **Unknown** unless data is verified; don't confuse Roblox-reported server ping with the local user's latency.
 - [ ] Investigate allowed RoValra integration or licensed provider access; don't scrape or redistribute service data without permission.
-- [x] On-demand previews of **up to five anonymous player avatars**, when Roblox includes public player tokens. Native Rust holds tokens in a short-lived bounded cache; the UI receives only checked CDN image URLs, never user IDs.
+- [x] On-demand previews of **up to five anonymous player avatars**; connected users receive automatic, one-batch previews for up to eight servers after manual refresh by default. Thirst stores public tokens only in bounded Rust memory and returns validated CDN image URLs, not user IDs. Auto previews are disableable and off in Lite Mode.
 - [ ] Investigate **explicitly opt-in authenticated Roblox requests** for account-specific server features (friends/presence and owned private servers). Public server listings should stay guest-accessible because Roblox marks those endpoints as cookie-optional. Before expanding cookie use beyond account verification, revise the 15-second consent disclosure, use only reviewed fixed Roblox HTTPS hosts in native Rust, preserve token rotation securely, respect per-endpoint limits, and never send cookies to third parties or Svelte.
 - [ ] Opt-in friends-in-server indicator, **only when** authorized presence data is accessible and players' Roblox visibility settings permit it.
-- [x] Filter/sort loaded servers by free slots, player counts, reported ping, saved-only, and job-ID search. Save individual server UUIDs locally with clear stale-server caveats. Region filtering and server-version metadata remain planned.
-- [ ] Add a verified region/provider architecture with source/confidence and optional server-version filters; never guess region from ping.
+- [x] Filter/sort loaded servers by free slots, player counts, reported ping, and job-ID search. No saved server UUIDs: Roblox instances are short-lived; only game/subplace favorites persist.
+- [ ] Implement region/provider integration only after obtaining a permitted, verifiable data source. RoValra's published API conditions restrict projects that replace its functionality; **no unapproved API access or scraping**. Per-server regions remain Unknown, with server version filtering pending.
 - [x] Basic manual-request cooldown (8 seconds) and extended 429 backoff (45 seconds), bounded 5-minute anonymous-avatar token cache, pagination, and native request timeouts.
 - [ ] Further investigate API response caching, server discovery completeness, and long-running rate-limit behavior before public release.
 
