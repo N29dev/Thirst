@@ -3,6 +3,7 @@
 
 mod auth;
 mod server_previews;
+mod rovalra;
 
 use std::time::Duration;
 use tauri_plugin_opener::OpenerExt;
@@ -317,10 +318,12 @@ pub fn run() {
     tauri::Builder::default()
         .manage(auth::AuthState::default())
         .manage(server_previews::PreviewCache::default())
+        .manage(rovalra::RegionProviderState::default())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             launch_place,
             list_public_servers,
+            rovalra::lookup_rovalra_regions,
             server_previews::server_avatar_preview,
             server_previews::server_avatar_previews,
             lookup_game,

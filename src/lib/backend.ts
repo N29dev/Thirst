@@ -27,6 +27,20 @@ export function discoverSubplaces(universeId: number, cursor: string | null): Pr
   return invoke<SubplacesPage>("discover_subplaces", { universeId, cursor });
 }
 
+// RoValra is a separate public region provider. This call does not use Roblox
+// credentials and sends only public place/server identifiers when invoked.
+export type ProviderRegion = {
+  serverId: string;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  source: "rovalra";
+};
+
+export function lookupRoValraRegions(placeId: number, serverIds: string[]): Promise<ProviderRegion[]> {
+  return invoke<ProviderRegion[]>("lookup_rovalra_regions", { placeId, serverIds });
+}
+
 export function platformName(): Promise<string> {
   return invoke<string>("platform_name");
 }
