@@ -18,6 +18,8 @@ This document tracks features requested during the first successful macOS alpha 
 - [x] On-demand public subplace discovery with paging and a Save action; manual IDs remain available as a fallback.
 - [x] Subtle cursor-following lighting on actionable cards, using requestAnimationFrame only while moving the pointer (no idle loops); Lite Mode and reduced-motion respected.
 - [x] Unified SVG icons for primary navigation, accessible active-page labels/tooltips, keyed short transitions between screens, restrained card/hero reveal motion, and responsive public-server loading skeletons.
+- [x] Replace the macOS blank placeholder and old Windows icon: generate an ICNS/ICO/PNG iconset from the branded Thirst SVG source before bundling; explicitly reference these formats in Tauri configuration and verify their inclusion in CI.
+- [ ] Confirm the new icon appears in the installed macOS Dock, Finder and Windows taskbar after replacing an older build (OS caches may need refreshing).
 - [ ] Audit keyboard and screen-reader navigation, and visually test at 740–1600px widths on both macOS and Windows.
 - [x] Let users **pin individual subplaces as standalone quick-launch tiles** on Overview, alongside experiences (e.g. BLR 8v8 / Pro / Customs), with direct launch and server browser shortcuts. Pins persist locally.
 - [x] Sort the My Library experience list by saved order, name A–Z, newest and oldest, with a local-only preference. The Overview shortcut order remains unchanged.
