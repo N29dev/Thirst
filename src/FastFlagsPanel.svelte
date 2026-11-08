@@ -499,7 +499,7 @@
   .ff-box h2{margin-bottom:9px}
   .ff-transfer>p strong{color:#d9f1fc}
   .ff-file-input{position:absolute;width:1px;height:1px;opacity:0}
-  .ff-file-input:focus-visible ~ .ff-workspace .ff-dropzone{outline:2px solid #89dfe9}
+  .ff-file-input:focus-visible + .ff-dropzone{outline:2px solid #89dfe9}
   .ff-dropzone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;margin:17px 0 18px;padding:24px 12px;border:1px dashed #47758c;background:linear-gradient(135deg,#162e3d,#132331);border-radius:14px;cursor:pointer;text-align:center;transition:background .15s,border-color .15s}
   .ff-dropzone:hover,.ff-dropzone.dragging{background:#1e3e50;border-color:#83d3e5}
   .ff-drop-symbol{display:grid;place-items:center;width:40px;height:40px;border:1px solid #47768d;border-radius:13px;background:#1d455a;font-size:26px;color:#9eebf6;margin-bottom:4px}
