@@ -20,3 +20,34 @@ export function discoverSubplaces(universeId: number, cursor: string | null): Pr
 export function platformName(): Promise<string> {
   return invoke<string>("platform_name");
 }
+
+export type ConnectedAccount = {
+  id: number;
+  name: string;
+  displayName: string;
+};
+
+// Authentication remains native-only. No function below returns a session cookie.
+export function beginRobloxConsent(): Promise<void> {
+  return invoke<void>("begin_roblox_consent");
+}
+
+export function openRobloxLogin(acknowledged: boolean): Promise<void> {
+  return invoke<void>("open_roblox_login", { acknowledged });
+}
+
+export function finishRobloxLogin(): Promise<ConnectedAccount> {
+  return invoke<ConnectedAccount>("finish_roblox_login");
+}
+
+export function connectedRobloxAccount(): Promise<ConnectedAccount | null> {
+  return invoke<ConnectedAccount | null>("connected_roblox_account");
+}
+
+export function disconnectRobloxAccount(): Promise<void> {
+  return invoke<void>("disconnect_roblox_account");
+}
+
+export function cancelRobloxLogin(): Promise<void> {
+  return invoke<void>("cancel_roblox_login");
+}
