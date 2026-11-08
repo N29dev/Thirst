@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import FastFlagsPanel from "./FastFlagsPanel.svelte";
   import {
     beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
     disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview, fetchServerAvatarPreviews,
@@ -17,7 +18,7 @@
   } from "./lib/regions";
   import type { LocalRegionReport, ProviderRegion, RegionCode, RegionFilter } from "./lib/regions";
 
-  type Tab = "home" | "library" | "servers" | "settings";
+  type Tab = "home" | "library" | "servers" | "fflags" | "settings";
   type QuickLaunchItem = {
     placeId: number;
     parentPlaceId: number;
@@ -890,6 +891,7 @@
     </nav>
     <span class="section-label section-spaced">PREFERENCES</span>
     <nav aria-label="Preferences">
+      <button class:active={tab === "fflags"} onclick={() => tab = "fflags"}><span class="nav-icon">⚑</span> Fast Flags</button>
       <button class:active={tab === "settings"} onclick={() => { tab = "settings"; if (!accountStatusLoaded) void loadConnectedAccount(); }}><span class="nav-icon">⚙</span> Settings</button>
     </nav>
     <div class="sidebar-bottom">
@@ -900,7 +902,7 @@
 
   <main>
     <header class="topbar">
-      <div class="breadcrumb">THIRST <span>/</span> {tab === "home" ? "OVERVIEW" : tab === "library" ? "LIBRARY" : tab === "servers" ? "SERVERS" : "SETTINGS"}</div>
+      <div class="breadcrumb">THIRST <span>/</span> {tab === "home" ? "OVERVIEW" : tab === "library" ? "LIBRARY" : tab === "servers" ? "SERVERS" : tab === "fflags" ? "FAST FLAGS" : "SETTINGS"}</div>
       <div class="top-actions"><span class="platform-tag">{platform}</span><span class="alpha-tag">EARLY ACCESS</span></div>
     </header>
     <div class="content">
@@ -1209,6 +1211,8 @@
             </div>
           {/if}
         </div>
+      {:else if tab === "fflags"}
+        <FastFlagsPanel />
       {:else}
         <div class="page-title"><div><span class="eyebrow">PREFERENCES & PRIVACY</span><h1>Settings</h1><p>Personalize Thirst without compromising performance.</p></div></div>
         <div class="settings-column">
