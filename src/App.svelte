@@ -1,6 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { discoverSubplaces, fetchPublicServers, launchPlace, lookupGame, platformName } from "./lib/backend";
+  import {
+    beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
+    disconnectRobloxAccount, discoverSubplaces, fetchPublicServers,
+    finishRobloxLogin, launchPlace, lookupGame, openRobloxLogin, platformName
+  } from "./lib/backend";
+  import type { ConnectedAccount } from "./lib/backend";
   import { isTrustedIconUrl, parsePlaceId, readLibrary, readLiteMode, writeLibrary, writeLiteMode } from "./lib/library";
   import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
 
@@ -30,6 +35,14 @@
   let discoveryAttempted = false;
   let discoveredPlaces: DiscoveredPlace[] = [];
   let discoveryCursor: string | null = null;
+  let connectedAccount: ConnectedAccount | null = null;
+  let checkingAccount = false;
+  let accountError = "";
+  let loginStep: "warning" | "browser" | null = null;
+  let loginBusy = false;
+  let readWarning = false;
+  let secondsLeft = 15;
+  let consentTimer: ReturnType<typeof setInterval> | undefined;
 
   $: selected = games.find(game => game.placeId === selectedId) || null;
   $: filteredGames = games.filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
@@ -54,8 +67,104 @@
     // Prevent a pending notification callback from outliving the desktop window.
     return () => {
       if (toastTimeout) clearTimeout(toastTimeout);
+      if (consentTimer) clearInterval(consentTimer);
     };
   });
+
+  async function loadConnectedAccount() {
+    if (checkingAccount) return;
+    checkingAccount = true;
+    accountError = "";
+    try {
+      connectedAccount = await connectedRobloxAccount();
+    } catch (error) {
+      connectedAccount = null;
+      accountError = String(error);
+    } finally {
+      checkingAccount = false;
+    }
+  }
+
+  function stopConsentTimer() {
+    if (consentTimer) clearInterval(consentTimer);
+    consentTimer = undefined;
+  }
+
+  async function beginLogin() {
+    if (loginBusy) return;
+    loginBusy = true;
+    try {
+      // Backend sets an independent monotonic timer; changing JS state
+      // cannot bypass the minimum 15-second consent gate.
+      await beginRobloxConsent();
+      loginStep = "warning";
+      secondsLeft = 15;
+      readWarning = false;
+      stopConsentTimer();
+      consentTimer = setInterval(() => {
+        secondsLeft = Math.max(0, secondsLeft - 1);
+        if (secondsLeft === 0) stopConsentTimer();
+      }, 1000);
+    } catch (error) {
+      notice("Could not open cookie consent: " + String(error), "bad");
+    } finally {
+      loginBusy = false;
+    }
+  }
+
+  async function openLoginWindow() {
+    if (loginBusy || secondsLeft > 0 || !readWarning) return;
+    loginBusy = true;
+    try {
+      await openRobloxLogin(true);
+      stopConsentTimer();
+      loginStep = "browser";
+    } catch (error) {
+      notice("Roblox sign-in window failed: " + String(error), "bad");
+    } finally {
+      loginBusy = false;
+    }
+  }
+
+  async function completeLogin() {
+    if (loginBusy) return;
+    loginBusy = true;
+    try {
+      connectedAccount = await finishRobloxLogin();
+      accountError = "";
+      loginStep = null;
+      notice("Connected to Roblox as @" + connectedAccount.name);
+    } catch (error) {
+      notice("Sign-in was not completed: " + String(error), "bad");
+    } finally {
+      loginBusy = false;
+    }
+  }
+
+  async function cancelLogin() {
+    stopConsentTimer();
+    loginStep = null;
+    try {
+      await cancelRobloxLogin();
+    } catch {
+      notice("Could not close the isolated login window.", "bad");
+    }
+  }
+
+  async function disconnectAccount() {
+    if (loginBusy) return;
+    loginBusy = true;
+    try {
+      await disconnectRobloxAccount();
+      connectedAccount = null;
+      accountError = "";
+      notice("Thirst's saved Roblox session was deleted locally.");
+    } catch (error) {
+      notice("Unable to disconnect: " + String(error), "bad");
+    } finally {
+      loginBusy = false;
+    }
+  }
 
   function hideBrokenIcon(event: Event) {
     if (event.currentTarget instanceof HTMLImageElement) {
@@ -308,7 +417,7 @@
     </nav>
     <span class="section-label section-spaced">PREFERENCES</span>
     <nav aria-label="Preferences">
-      <button class:active={tab === "settings"} onclick={() => tab = "settings"}><span class="nav-icon">⚙</span> Settings</button>
+      <button class:active={tab === "settings"} onclick={() => { tab = "settings"; void loadConnectedAccount(); }}><span class="nav-icon">⚙</span> Settings</button>
     </nav>
     <div class="sidebar-bottom">
       <div class="sidebar-note"><span class="note-indicator"></span><span>Local-first · No account needed</span></div>
@@ -493,14 +602,79 @@
         <div class="page-title"><div><span class="eyebrow">PREFERENCES & PRIVACY</span><h1>Settings</h1><p>Personalize Thirst without compromising performance.</p></div></div>
         <div class="settings-column">
           <section class="panel settings-panel"><div><h3>Lite Mode</h3><p>Disable decorative gradients and transitions to reduce UI overhead.</p></div><label class="switch"><input type="checkbox" checked={liteMode} onchange={e => setLiteMode(e.currentTarget.checked)} /><span class="slider"></span></label></section>
-          <section class="panel settings-panel"><div><h3>Roblox account</h3><p>AppleBlox-style browser login is planned, but not enabled until session isolation and native credential storage are audited. Never paste your .ROBLOSECURITY cookie into the launcher.</p><span class="chip">NOT CONNECTED · COMING LATER</span></div><span class="settings-icon">♙</span></section>
+          <section class="panel settings-panel account-settings">
+            <div class="account-info">
+              <h3>Roblox account</h3>
+              <p>Optional browser-based session connection. Your session cookie is read only by native Rust and stored in your OS credential vault, never in Thirst's UI, SQLite, or our server.</p>
+              {#if connectedAccount}
+                <div class="connected-account">
+                  <span class="connected-indicator"></span>
+                  <div><strong>{connectedAccount.displayName} (@{connectedAccount.name})</strong><small>Roblox user ID: {connectedAccount.id}</small></div>
+                </div>
+              {:else if checkingAccount}
+                <span class="chip">CHECKING ACCOUNT…</span>
+              {:else if accountError}
+                <p class="account-error">Saved account could not be verified: {accountError}</p>
+              {:else}
+                <span class="chip">NO VERIFIED ACCOUNT</span>
+              {/if}
+              <p class="account-footnote">This is an experimental full-session login. A stolen cookie can compromise your Roblox account. Local disconnect does not revoke the Roblox session on Roblox's servers.</p>
+              <div class="account-buttons">
+                <button class="btn primary" onclick={beginLogin} disabled={loginBusy}>Connect Roblox account</button>
+                <button class="btn secondary" onclick={loadConnectedAccount} disabled={checkingAccount}>↻ Check status</button>
+                {#if connectedAccount || accountError}
+                  <button class="btn danger subtle" onclick={disconnectAccount} disabled={loginBusy}>Disconnect / delete local credential</button>
+                {/if}
+              </div>
+            </div>
+            <span class="settings-icon">♙</span>
+          </section>
           <section class="panel settings-panel"><div><h3>Network behavior</h3><p>No background polling. On-demand requests use fixed Roblox API hosts in Rust; approved game icons load from Roblox CDN. No Thirst backend or analytics service.</p><span class="chip">LOCAL-FIRST</span></div><span class="settings-icon">◎</span></section>
-          <section class="panel settings-panel"><div><h3>Early development</h3><p>Thirst Alpha 0.1.0 · Native macOS and Windows builds require platform testing. Features from AppleBlox/Lunar will be added incrementally.</p></div><span class="settings-icon">◈</span></section>
+          <section class="panel settings-panel"><div><h3>Early development</h3><p>Thirst Alpha 0.3 (experimental authentication). Test with a separate, low-value Roblox account before using your main account.</p></div><span class="settings-icon">◈</span></section>
         </div>
       {/if}
       <footer class="app-footer"><span>THIRST / OPEN SOURCE PROJECT</span><span>BUILT TO STAY OUT OF YOUR GAME'S WAY.</span></footer>
     </div>
   </main>
+  {#if loginStep}
+    <div class="consent-overlay">
+      <section role="dialog" aria-modal="true" aria-labelledby="login-warning-title" class="consent-dialog">
+        <div class="consent-topline"><span class="consent-alert-icon">!</span><span>THIRST ACCOUNT CONNECTION · HIGH-RISK PERMISSION</span></div>
+        {#if loginStep === "warning"}
+          <h2 id="login-warning-title">Read before connecting your Roblox account.</h2>
+          <p class="consent-lead">Thirst will access your <strong>.ROBLOSECURITY session cookie</strong> after you sign in on the official Roblox website. This cookie can grant full access to your account.</p>
+          <div class="consent-disclosure">
+            <div><strong>What Thirst will access</strong><p>A Roblox session cookie from an isolated sign-in window. A stolen copy may let someone access your account without your password or 2-step verification.</p></div>
+            <div><strong>Where it will be stored</strong><p>Locally using macOS Keychain or Windows Credential Manager, not in browser localStorage, project files, logs or cloud storage.</p></div>
+            <div><strong>Where it will be sent</strong><p>Only to the fixed Roblox verification endpoint when you choose to connect or check your session. No Thirst, RoValra or Discord server receives it.</p></div>
+            <div><strong>Important limitations</strong><p>Native local malware or a compromised launcher build could still steal a cookie. This is an experimental feature and is not independently security-audited.</p></div>
+          </div>
+          <label class="consent-confirm">
+            <input type="checkbox" bind:checked={readWarning} />
+            <span>I understand that Thirst will read and store my Roblox session cookie locally, and that I can choose not to connect.</span>
+          </label>
+          <div class="consent-footer">
+            <button class="btn secondary" onclick={cancelLogin}>Cancel — use Thirst as guest</button>
+            <button class="btn primary" onclick={openLoginWindow} disabled={secondsLeft > 0 || !readWarning || loginBusy}>
+              {secondsLeft > 0 ? "Read warning (" + secondsLeft + "s)" : "Open official Roblox login"}
+            </button>
+          </div>
+          <p class="consent-endnote">15-second review is enforced by the native app as well as this screen. It does not eliminate the security risk.</p>
+        {:else}
+          <h2 id="login-warning-title">Sign in on the official Roblox page.</h2>
+          <p class="consent-lead">The isolated browser window opened to <strong>https://www.roblox.com/login</strong>. Complete Roblox sign-in there, then return here and click <strong>Finish connection</strong>.</p>
+          <div class="consent-disclosure">
+            <div><strong>No copying cookies</strong><p>Do not paste your .ROBLOSECURITY value anywhere. Thirst reads it from its own isolated browser session only when you finish.</p></div>
+            <div><strong>Use a test account</strong><p>Because authentication is still experimental, please test it with an account you would be comfortable revoking.</p></div>
+          </div>
+          <div class="consent-footer">
+            <button class="btn secondary" onclick={cancelLogin} disabled={loginBusy}>Cancel sign-in</button>
+            <button class="btn primary" onclick={completeLogin} disabled={loginBusy}>{loginBusy ? "Verifying with Roblox…" : "Finish connection"}</button>
+          </div>
+        {/if}
+      </section>
+    </div>
+  {/if}
   {#if toast}
     <div class:bad={toastKind === "bad"} class="toast" role="status"><span>{toastKind === "bad" ? "!" : "✓"}</span>{toast}<button aria-label="Dismiss notification" onclick={dismissToast}>×</button></div>
   {/if}
