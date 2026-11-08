@@ -62,6 +62,17 @@ export function writeLiteMode(enabled: boolean): void {
   localStorage.setItem(SETTINGS_KEY, enabled ? "lite" : "full");
 }
 
+// This is a non-sensitive UI preference. No account ID or cookie is stored.
+const AUTO_AVATAR_KEY = "thirst.preferences.auto-avatars.v1";
+
+export function readAutoAvatarPreviews(): boolean {
+  return localStorage.getItem(AUTO_AVATAR_KEY) !== "off";
+}
+
+export function writeAutoAvatarPreviews(enabled: boolean): void {
+  localStorage.setItem(AUTO_AVATAR_KEY, enabled ? "on" : "off");
+}
+
 export function parsePlaceId(text: string): number | null {
   const raw = text.trim();
   const match = raw.match(/^https:\/\/(?:www\.)?roblox\.com\/games\/(\d+)(?:[/?#].*)?$/i);
