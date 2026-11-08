@@ -11,7 +11,7 @@ npm install
 npm run tauri dev
 ~~~
 
-## Unsigned test builds
+## Ad-hoc signed test builds
 
 Thirst has a [GitHub Actions test-bundle workflow](https://github.com/N29dev/Thirst/actions/workflows/package.yml) for a macOS Apple Silicon app and a Windows NSIS installer. The workflow checks the macOS app bundle actually contains its native Roblox login helper.
 
@@ -29,7 +29,33 @@ npm install
 npm run bundle:windows
 ~~~
 
-The macOS package is an .app bundle. The Windows package is an NSIS .exe. Artifacts are attached to successful packaging workflow runs. These are developer-test packages, not signed/notarized public releases. macOS Gatekeeper and Windows SmartScreen may warn until publisher signing and real-device verification are complete. Do not disable operating-system protections globally.
+The macOS package is an Apple Silicon .app bundle. Tauri now applies an **ad-hoc code signature** (`bundle.macOS.signingIdentity = "-"`); the separately bundled Swift login helper is also ad-hoc signed. GitHub Actions verifies both signatures before uploading the test build. This is **not** an Apple Developer ID signature and **not** notarization. macOS Gatekeeper can still require an individual user exception. Windows provides a test NSIS .exe and may trigger SmartScreen. These artifacts are developer previews, not a public, verified release.
+
+GitHub Actions uploads `Thirst-macOS-arm64-ad-hoc`, which downloads as an artifact ZIP containing `Thirst-macOS-arm64.zip`. Extract the inner ZIP with Archive Utility to obtain `Thirst.app`, then drag it into Applications.
+
+### macOS says "Thirst is damaged and can't be opened"
+
+The message can indicate a blocked unsigned/unnotarized download **or** a genuinely corrupt or modified app. First download the latest build from this repository's own Actions workflow and extract the archive fully; don't run a partially extracted or modified bundle. Confirm your Mac is Apple Silicon (M-series); this workflow doesn't build an Intel version.
+
+If you trust this specific build, after trying to open it:
+
+1. Open **System Settings → Privacy & Security** and use **Open Anyway** if macOS offers that option.
+2. If macOS still reports damage, verify the bundle before applying any exception:
+
+~~~bash
+codesign --verify --deep --strict --verbose=2 /Applications/Thirst.app
+~~~
+
+3. If signature verification succeeds and you are certain the bundle came directly from this project's own workflow, you can remove the quarantine metadata from **only this copy** to test it:
+
+~~~bash
+xattr -dr com.apple.quarantine /Applications/Thirst.app
+open /Applications/Thirst.app
+~~~
+
+If verification fails, **do not override Gatekeeper**. Re-download or rebuild; include the `codesign` output in a bug report. The `xattr` command is not for unrelated or untrusted applications. Never disable Gatekeeper globally (`spctl --master-disable`).
+
+For a warning-free public installer, Thirst still needs a Developer ID Application certificate, Apple notarization, and real-device launch testing. Ad-hoc signing cannot substitute for those requirements.
 
 ## Login and settings
 
