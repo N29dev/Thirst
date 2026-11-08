@@ -13,7 +13,8 @@ This document tracks features requested during the first successful macOS alpha 
 
 ## Alpha 0.2 — Polished library and navigation
 
-- [x] Compact favorite-game icon grid on Overview, with launch and server buttons.
+- [x] Image-forward, responsive Quickplay favorite cards with prominent public Roblox artwork, distinct play/server actions, experience/subplace tags and fade-in image loading. Missing or broken CDN images fall back to readable initials without adding new network providers.
+- [x] Enhanced Library selection: larger illustrated saved-game rows, accurate saved/pinned counts, more useful empty-search state and a featured selected-game header with existing action buttons.
 - [x] Retrieve official Roblox game names/icons when saving, store the validated CDN icon URL locally; existing bookmarks support explicit metadata refresh (no background polling).
 - [x] On-demand public subplace discovery with paging and a Save action; manual IDs remain available as a fallback.
 - [x] Subtle cursor-following lighting on actionable cards, using requestAnimationFrame only while moving the pointer (no idle loops); Lite Mode and reduced-motion respected.
