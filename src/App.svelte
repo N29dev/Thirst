@@ -605,7 +605,7 @@
           <section class="panel settings-panel account-settings">
             <div class="account-info">
               <h3>Roblox account</h3>
-              <p>Optional browser-based session connection. Your session cookie is read only by native Rust and stored in your OS credential vault, never in Thirst's UI, SQLite, or our server.</p>
+              <p>Optional official Roblox login. On macOS Thirst uses a separate native Swift/WebKit sign-in window; on Windows it uses an isolated Tauri webview. Session credentials are handled by native code and stored locally in your OS credential vault, never in the Thirst UI, SQLite, or our server.</p>
               {#if connectedAccount}
                 <div class="connected-account">
                   <span class="connected-indicator"></span>
@@ -662,9 +662,9 @@
           <p class="consent-endnote">15-second review is enforced by the native app as well as this screen. It does not eliminate the security risk.</p>
         {:else}
           <h2 id="login-warning-title">Sign in on the official Roblox page.</h2>
-          <p class="consent-lead">The isolated browser window opened to <strong>https://www.roblox.com/login</strong>. Complete Roblox sign-in there, then return here and click <strong>Finish connection</strong>.</p>
+          <p class="consent-lead">The separate Roblox sign-in window opens at <strong>https://www.roblox.com/login</strong>. {platform === "macOS" ? "On macOS, the native window automatically closes after detecting a successful session." : "On Windows, complete sign-in in the isolated window."} Then return to Thirst and click <strong>Finish connection</strong>.</p>
           <div class="consent-disclosure">
-            <div><strong>No copying cookies</strong><p>Do not paste your .ROBLOSECURITY value anywhere. Thirst reads it from its own isolated browser session only when you finish.</p></div>
+            <div><strong>No copying cookies</strong><p>Do not paste your .ROBLOSECURITY value anywhere. On macOS, the native helper stores it in a temporary Keychain entry automatically; Thirst verifies and promotes it only when you finish. Windows reads its isolated webview on Finish.</p></div>
             <div><strong>Use a test account</strong><p>Because authentication is still experimental, please test it with an account you would be comfortable revoking.</p></div>
           </div>
           <div class="consent-footer">
