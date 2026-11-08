@@ -55,3 +55,33 @@ main{min-width:0;min-height:100vh;display:flex;flex-direction:column}.topbar{hei
 .discovered-place .row-actions button.save-place{width:auto;min-width:54px;padding:0 7px;font-size:11px}
 .saved-label{font-size:9px;color:#80d2bf;letter-spacing:1px;font-weight:800}
 @media(max-width:760px){.quick-launch-grid{grid-template-columns:repeat(auto-fill,minmax(105px,1fr))}.quick-game-main{min-height:116px}.discovery-heading{align-items:flex-start;flex-wrap:wrap}}
+
+
+/* Account privacy: session data never appears in HTML or CSS. */
+.account-settings{align-items:flex-start}
+.account-info{flex:1;min-width:0}
+.account-buttons{display:flex;flex-wrap:wrap;gap:9px;margin-top:15px}
+.account-buttons .btn{white-space:normal}
+.account-footnote{color:#c7a27a!important;max-width:760px!important}
+.account-error{color:#f5a4a4!important}
+.connected-account{display:flex;align-items:center;gap:13px;padding:12px 15px;margin-top:14px;border:1px solid #296b58;background:#132d2c;border-radius:11px;max-width:max-content}
+.connected-indicator{width:9px;height:9px;border-radius:100%;background:#66d6b1}
+.connected-account strong,.connected-account small{display:block}
+.connected-account strong{font-size:13px}.connected-account small{color:#9fbab5;font-size:11px;margin-top:4px}
+.consent-overlay{position:fixed;inset:0;z-index:40;background:#03070eea;display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}
+.consent-dialog{background:#111a28;border:1px solid #986f3c;border-radius:18px;max-width:710px;width:100%;max-height:calc(100vh - 30px);overflow-y:auto;padding:28px;box-shadow:0 35px 120px #000a;color:#eaf3fd}
+.consent-topline{display:flex;align-items:center;gap:11px;color:#f5bc72;font-size:11px;font-weight:850;letter-spacing:1.4px;line-height:1.6}
+.consent-alert-icon{display:grid;place-items:center;width:30px;height:30px;font-weight:900;font-size:20px;color:#272017;background:#ffbc72;border-radius:8px;flex-shrink:0}
+.consent-dialog h2{font-size:26px;letter-spacing:-.8px;line-height:1.3;margin:21px 0 10px}
+.consent-lead{font-size:14px;line-height:1.75;color:#c8d4df}
+.consent-lead strong{color:#ffcb8c}
+.consent-disclosure{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin:21px 0}
+.consent-disclosure>div{border:1px solid #3f4650;background:#151f2d;border-radius:11px;padding:14px}
+.consent-disclosure strong{font-size:12px;color:#f5d5aa}
+.consent-disclosure p{font-size:11px;color:#aabaca;line-height:1.7;margin:7px 0 0}
+.consent-confirm{display:flex;align-items:flex-start;gap:12px;padding:15px;border:1px solid #ad8152;background:#2c251f;border-radius:11px;font-size:12px;line-height:1.7;color:#f4e4d3;cursor:pointer}
+.consent-confirm input{margin:3px 0 0;width:18px;height:18px;accent-color:#80dce8;flex-shrink:0}
+.consent-footer{display:flex;gap:10px;justify-content:flex-end;align-items:center;flex-wrap:wrap;margin-top:21px}
+.consent-footer .btn{font-size:13px;padding:12px 17px}
+.consent-endnote{color:#8f9ead;font-size:10px;line-height:1.6;margin:14px 0 0}
+@media(max-width:620px){.consent-overlay{padding:9px}.consent-dialog{padding:18px;max-height:calc(100vh - 18px)}.consent-disclosure{grid-template-columns:1fr}.consent-dialog h2{font-size:21px}.consent-footer .btn{width:100%}}
