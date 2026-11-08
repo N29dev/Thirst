@@ -1,4 +1,4 @@
-import type { SavedGame } from "./types";
+import type { GameMetadata, SavedGame } from "./types";
 import { isTrustedIconUrl, validPlaceId } from "./library";
 import { isValidServerId } from "./servers";
 
@@ -12,6 +12,7 @@ export type PlayerSession = {
 export type ActivityEntry = {
   placeId: number;
   name: string;
+  iconUrl?: string;
   serverId: string | null;
   joinedAt: number;
   endedAt: number | null;
@@ -78,6 +79,7 @@ export function readActivityHistory(): ActivityEntry[] {
       const e = item as ActivityEntry;
       return validPlaceId(e.placeId) &&
         typeof e.name === "string" && e.name.length > 0 && e.name.length <= 120 &&
+        (e.iconUrl === undefined || isTrustedIconUrl(e.iconUrl)) &&
         (e.serverId === null || isValidServerId(e.serverId)) &&
         cleanTime(e.joinedAt, now) &&
         (e.endedAt === null || (cleanTime(e.endedAt, now) && e.endedAt >= e.joinedAt)) &&
@@ -100,7 +102,9 @@ export function recordLaunchAttempt(
 ): ActivityEntry[] {
   if (!validPlaceId(placeId) || (serverId && !isValidServerId(serverId))) return entries;
   const attempt: ActivityEntry = {
-    placeId, name: knownName(games, placeId), serverId,
+    placeId, name: knownName(games, placeId),
+    iconUrl: activityIcon(games, placeId) ?? undefined,
+    serverId,
     joinedAt: at, endedAt: null, source: "launch-request"
   };
   return persist([attempt, ...entries]);
@@ -136,11 +140,25 @@ export function mergeObservedSessions(
       if (name.startsWith("Place ")) name = attempt.name;
     }
     result.push({
-      placeId: obs.placeId, name, serverId: obs.serverId,
+      placeId: obs.placeId, name,
+      iconUrl: activityIcon(games, obs.placeId) ?? undefined,
+      serverId: obs.serverId,
       joinedAt: obs.joinedAt, endedAt: obs.endedAt, source: "player-log"
     });
   }
   return persist(result);
+}
+
+export function addActivityMetadata(
+  entries: ActivityEntry[], placeId: number, metadata: GameMetadata
+): ActivityEntry[] {
+  if (!validPlaceId(placeId)) return entries;
+  const name = metadata.name.trim().slice(0, 100);
+  const iconUrl = isTrustedIconUrl(metadata.iconUrl) ? metadata.iconUrl : undefined;
+  if (!name) return entries;
+  return persist(entries.map(entry => entry.placeId === placeId
+    ? { ...entry, name, iconUrl: iconUrl ?? entry.iconUrl }
+    : entry));
 }
 
 export function clearActivityHistory(): ActivityEntry[] {
