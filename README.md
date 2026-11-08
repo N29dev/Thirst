@@ -8,7 +8,7 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 
 ## What works now
 
-- Dark desktop interface with a low-overhead Lite Mode and subtle cursor-following lighting on cards; effects pause when idle and are disabled with Lite Mode or reduced motion.
+- **Refined desktop interface:** matching SVG navigation icons and clear active-page indicators, short screen-entry and card-reveal transitions, polished hover/press feedback, more readable panel hierarchy, responsive server-loading skeletons, and visible keyboard focus. No continuously animated wallpaper or network fonts. **Lite Mode and reduced-motion preferences disable decorative motion**; performance remains the priority. See [Visual design notes](docs/VISUALS.md).
 - Save favorite Roblox experiences using place IDs or official game URLs. Thirst retrieves their public names and icons on demand, with manual-name fallback.
 - Sort My Library by saved order, name A–Z, newest or oldest. **Import/export library backups** as JSON; imports merge saved games and pinned subplaces. Local-only, no cookies or Roblox credentials.
 - **Recent launches:** quick reopen of Roblox places previously opened through Thirst; these are launch requests, not proof of an actual join.
@@ -51,7 +51,7 @@ Test bundling is enabled. Run `npm run bundle:mac` on macOS (Apple Silicon `.app
 
 | Capability | State |
 | --- | --- |
-| App shell, UI, Lite Mode | Implemented |
+| App shell, responsive UI, Lite Mode and accessible motion | Implemented; real-device visual QA ongoing |
 | Quick-launch icons, on-demand game details, public subplace discovery | Implemented |
 | Favorite games and subplaces | Implemented locally |
 | Public server listing + direct-server launch | Implemented, subject to Roblox availability |
