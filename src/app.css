@@ -159,3 +159,8 @@ main{min-width:0;min-height:100vh;display:flex;flex-direction:column}.topbar{hei
 .server-id-copy:hover{color:#9ceaf2}
 .server-id-copy span{color:#729db3;font-size:12px}
 .server-id-copy:focus-visible{outline:2px solid #8ae6f2;outline-offset:2px;border-radius:4px}
+
+.library-sort-controls{display:flex;align-items:center;gap:9px;justify-content:space-between;padding:0 17px 14px;color:#96b3c4;font-size:11px}
+.library-sort-controls label{white-space:nowrap}
+.library-sort-controls select{font-size:11px;max-width:165px;min-width:0;height:34px}
+@media(max-width:760px){.library-sort-controls{padding:0 11px 12px;gap:6px}.library-sort-controls select{max-width:130px}}
