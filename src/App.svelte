@@ -2,7 +2,7 @@
   import { onMount } from "svelte";
   import {
     beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
-    disconnectRobloxAccount, discoverSubplaces, fetchPublicServers,
+    disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview,
     finishRobloxLogin, launchPlace, lookupGame, openRobloxLogin, platformName, pollRobloxLoginStatus
   } from "./lib/backend";
   import type { ConnectedAccount } from "./lib/backend";
@@ -45,6 +45,10 @@
   let serverFavoritesOnly = false;
   let serverSearch = "";
   let serverLoadError = "";
+  let expandedPreviewId: string | null = null;
+  let previewLoadingId: string | null = null;
+  let avatarPreviews: Record<string, string[]> = {};
+  let avatarErrors: Record<string, string> = {};
   let cursor: string | null = null;
   let nextCursor: string | null = null;
   let fetchedAt: Date | null = null;
@@ -437,6 +441,10 @@
     nextCursor = null;
     fetchedAt = null;
     serverLoadError = "";
+    expandedPreviewId = null;
+    previewLoadingId = null;
+    avatarPreviews = {};
+    avatarErrors = {};
   }
 
   function removeGame() {
@@ -479,6 +487,10 @@
     nextCursor = null;
     fetchedAt = null;
     serverLoadError = "";
+    expandedPreviewId = null;
+    previewLoadingId = null;
+    avatarPreviews = {};
+    avatarErrors = {};
   }
 
   async function play(placeId: number, jobId: string | null = null) {
@@ -514,6 +526,30 @@
       }
     } finally {
       loading = false;
+    }
+  }
+
+  async function toggleServerPreview(serverId: string) {
+    const placeId = activePlaceId;
+    if (!placeId || !isValidServerId(serverId)) return;
+    if (expandedPreviewId === serverId) {
+      expandedPreviewId = null;
+      return;
+    }
+    expandedPreviewId = serverId;
+    if (Object.prototype.hasOwnProperty.call(avatarPreviews, serverId) ||
+        avatarErrors[serverId] || previewLoadingId === serverId) return;
+    previewLoadingId = serverId;
+    try {
+      const urls = await fetchServerAvatarPreview(placeId, serverId);
+      if (activePlaceId !== placeId) return;
+      avatarPreviews = { ...avatarPreviews, [serverId]: urls.filter(isTrustedIconUrl).slice(0, 5) };
+    } catch (error) {
+      if (activePlaceId === placeId) {
+        avatarErrors = { ...avatarErrors, [serverId]: String(error) };
+      }
+    } finally {
+      if (previewLoadingId === serverId) previewLoadingId = null;
     }
   }
 
@@ -783,9 +819,29 @@
               <span>{server.ping === null ? "—" : Math.round(server.ping) + " ms"}</span>
               <div class="server-actions">
                 <button class:saved={isSavedServer(server.id)} class="server-star" aria-pressed={isSavedServer(server.id)} title={isSavedServer(server.id) ? "Unsave this server" : "Save this server ID"} aria-label={isSavedServer(server.id) ? "Unsave server " + server.id : "Save server " + server.id} onclick={() => toggleSavedServer(server.id)}>{isSavedServer(server.id) ? "★" : "☆"}</button>
+                <button class:active={expandedPreviewId === server.id} class="server-preview-button" aria-expanded={expandedPreviewId === server.id} title="Show up to five anonymous player avatars" onclick={() => toggleServerPreview(server.id)}>Avatars</button>
                 <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join ↗</button>
               </div>
             </div>
+            {#if expandedPreviewId === server.id}
+              <div class="server-avatar-panel">
+                <span class="preview-caption">Anonymous public avatar previews · no player names or IDs</span>
+                {#if previewLoadingId === server.id}
+                  <span class="preview-status">Requesting up to five thumbnails from Roblox…</span>
+                {:else if avatarErrors[server.id]}
+                  <span class="preview-status preview-error">{avatarErrors[server.id]}</span>
+                  <button class="btn small secondary" onclick={() => { avatarErrors = { ...avatarErrors, [server.id]: "" }; expandedPreviewId = null; void toggleServerPreview(server.id); }}>Retry</button>
+                {:else if avatarPreviews[server.id]?.length}
+                  <div class="avatar-image-row">
+                    {#each avatarPreviews[server.id] as imageUrl (imageUrl)}
+                      <img src={imageUrl} alt="Anonymous Roblox player avatar" loading="lazy" decoding="async" onerror={hideBrokenIcon} />
+                    {/each}
+                  </div>
+                {:else}
+                  <span class="preview-status">Roblox did not return any displayable public thumbnails.</span>
+                {/if}
+              </div>
+            {/if}
           {:else}
             <div class="empty-state server-empty"><div class="empty-mark">◎</div>
               <strong>{servers.length ? "No loaded servers match these filters" : "No server data loaded"}</strong>
