@@ -60,6 +60,7 @@ impl PreviewCache {
 struct Request {
     request_id: String,
     token: String,
+    target_id: u64,
     #[serde(rename = "type")]
     thumbnail_type: &'static str,
     size: &'static str,
@@ -96,13 +97,14 @@ pub async fn server_avatar_preview(
         return Err("Roblox did not provide public avatar preview tokens for this loaded server. Refresh the list or try another server.".into());
     }
 
-    let requests: Vec<Request> = tokens.into_iter().enumerate()
-        .map(|(index, token)| Request {
-            request_id: format!("thirst-preview-{index}"),
+    let requests: Vec<Request> = tokens.into_iter()
+        .map(|token| Request {
+            request_id: format!("0:{token}:AvatarHeadshot:150x150:png:regular"),
             token,
+            target_id: 0,
             thumbnail_type: "AvatarHeadShot",
             size: "150x150",
-            format: "Png",
+            format: "png",
             is_circular: false,
         })
         .collect();
