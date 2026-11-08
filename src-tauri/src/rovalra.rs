@@ -5,17 +5,29 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 use tauri::State;
 
 const MAX_SERVERS: usize = 25;
-const LOOKUP_COOLDOWN: Duration = Duration::from_secs(30);
 const RATE_LIMIT_COOLDOWN: Duration = Duration::from_secs(120);
 
 #[derive(Default)]
 pub struct RegionProviderState {
+    // No artificial successful-request cooldown. A real HTTP 429 still
+    // establishes provider-requested backoff, and parallel calls are coalesced.
     next_allowed: Mutex<Option<Instant>>,
+    in_flight: Arc<AtomicBool>,
+}
+
+// Own the shared flag so cleanup is guaranteed across *all* return paths,
+// including network errors, early exits, and cancellation.
+struct InFlightLookup(Arc<AtomicBool>);
+impl Drop for InFlightLookup {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -169,20 +181,22 @@ pub async fn lookup_rovalra_regions(
         ids.insert(uuid.to_string());
     }
 
+    if state.in_flight.swap(true, Ordering::AcqRel) {
+        return Err("A region lookup is already running. Retry when it finishes.".into());
+    }
+    let _in_flight = InFlightLookup(Arc::clone(&state.in_flight));
     {
-        let mut next_allowed = state.next_allowed.lock()
+        let next_allowed = state.next_allowed.lock()
             .map_err(|_| "Region lookup state unavailable.".to_owned())?;
         if let Some(until) = *next_allowed {
             let now = Instant::now();
             if now < until {
                 return Err(format!(
-                    "RoValra request cooldown: retry after {} seconds.",
+                    "RoValra rate-limited this client; retry in {} seconds.",
                     until.duration_since(now).as_secs() + 1
                 ));
             }
         }
-        // Reserve before the network request to prevent rapid parallel calls.
-        *next_allowed = Some(Instant::now() + LOOKUP_COOLDOWN);
     }
 
     let mut sorted_ids: Vec<String> = ids.iter().cloned().collect();
@@ -280,6 +294,18 @@ pub async fn lookup_rovalra_regions(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn in_flight_guard_releases_even_after_early_return() {
+        let state = RegionProviderState::default();
+        let flag = Arc::clone(&state.in_flight);
+        assert!(!flag.swap(true, Ordering::AcqRel));
+        {
+            let _guard = InFlightLookup(Arc::clone(&flag));
+            assert!(flag.load(Ordering::Acquire));
+        }
+        assert!(!flag.load(Ordering::Acquire));
+    }
 
     #[test]
     fn filters_unknown_and_unrequested_servers() {
