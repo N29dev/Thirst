@@ -43,7 +43,11 @@ jobs:
           APP="src-tauri/target/release/bundle/macos/Thirst.app"
           HELPER="$APP/Contents/Resources/resources/ThirstLogin"
           test -x "$HELPER"
-          file "$APP/Contents/MacOS/thirst" "$HELPER"
+          test -s "$APP/Contents/Resources/icon.icns"
+          file "$APP/Contents/MacOS/thirst" "$HELPER" "$APP/Contents/Resources/icon.icns"
+          ICON_NAME=$(plutil -extract CFBundleIconFile raw -o - "$APP/Contents/Info.plist")
+          echo "macOS CFBundleIconFile: $ICON_NAME"
+          test "$ICON_NAME" = "icon.icns" || test "$ICON_NAME" = "icon"
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign --verify --strict --verbose=2 "$HELPER"
           codesign -dv --verbose=2 "$APP" 2>&1 | grep -E "Signature=adhoc|Authority=|Identifier="
@@ -83,6 +87,11 @@ jobs:
             }
           }
           exit 1
+      - name: Verify generated Windows icon
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'src-tauri/icons/icon.ico')) { throw 'Windows icon missing' }
+          if ((Get-Item 'src-tauri/icons/icon.ico').Length -lt 5000) { throw 'Windows icon is unexpectedly small' }
       - uses: actions/upload-artifact@v4
         with:
           name: Thirst-Windows-unsigned
