@@ -967,7 +967,7 @@
 <div class:lite={liteMode} class="app">
   <aside class="sidebar">
     <button class="brand" onclick={() => tab = "home"} aria-label="Thirst home">
-      <span class="logo">◕</span>
+      <span class="logo"><span class="logo-letter">T</span></span>
       <span class="brand-text"><strong>thirst<span class="brand-dot">.</span></strong><small>ROBLOX LAUNCHER</small></span>
     </button>
     <span class="section-label">WORKSPACE</span>
@@ -978,7 +978,7 @@
     </nav>
     <span class="section-label section-spaced">PREFERENCES</span>
     <nav aria-label="Preferences">
-      <button class:active={tab === "fflags"} onclick={() => tab = "fflags"}><span class="nav-icon">⚑</span> Fast Flags</button>
+      <button class:active={tab === "fflags"} onclick={() => tab = "fflags"}><span class="nav-icon">✧</span> Fast Flags</button>
       <button class:active={tab === "settings"} onclick={() => { tab = "settings"; if (!accountStatusLoaded) void loadConnectedAccount(); }}><span class="nav-icon">⚙</span> Settings</button>
     </nav>
     <div class="sidebar-bottom">
@@ -1005,7 +1005,17 @@
               <button class="btn secondary" onclick={enterServerBrowser}>Browse servers →</button>
             </div>
           </div>
-          <div class="hero-art" aria-hidden="true"><div class="orb orb-outer"><div class="orb orb-inner">T</div></div></div>
+          <div class="hero-scene" aria-hidden="true">
+            <div class="hero-scene-halo"></div>
+            <div class="hero-scene-card">
+              <div class="scene-card-top"><span class="scene-wordmark"><b>T</b> THIRST</span><span class="scene-ready"><i></i> READY TO PLAY</span></div>
+              <div class="scene-card-main"><span class="scene-app-icon">◈</span><span><strong>Your next session</strong><small>Discover · Customize · Launch</small></span><span class="scene-arrow">↗</span></div>
+              <div class="scene-card-lines"><span></span><span></span><span></span></div>
+              <div class="scene-card-pills"><span>Game library</span><span>Server browser</span><span>Fast Flags</span></div>
+            </div>
+            <div class="scene-float scene-float-one">✦ Local-first</div>
+            <div class="scene-float scene-float-two">↗ Fast launch</div>
+          </div>
         </div>
         <div class="stats">
           <div class="stat hover-glow" onpointermove={moveHoverLight}><small>SAVED EXPERIENCES</small><strong>{games.length.toString().padStart(2, "0")}</strong><span>In your personal library</span></div>
