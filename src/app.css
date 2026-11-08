@@ -903,3 +903,50 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 }
 @media(prefers-reduced-motion:reduce){.server-shortcut-items button{transition:none}}
 .lite .server-shortcut-items button{transition:none!important}
+
+
+/* Library/Quickplay layout corrections (Nov 2026).
+   Roblox game icons are square; keep their complete artwork visible rather
+   than cropping it into the older 1.4:1 banner shape. */
+.library-layout{align-items:start}
+.library-layout > .panel{min-width:0;min-height:0}
+.detail-panel{min-width:0}
+.quick-game-media{aspect-ratio:1 / 1;height:auto;max-height:none}
+.quick-game-main{min-width:0;overflow:hidden}
+.quick-game-kind{max-width:calc(100% - 67px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.quick-game-info{width:100%;box-sizing:border-box;min-width:0}
+.quick-game-info strong{max-width:100%}
+.game-spotlight{
+  margin:0;min-width:0;min-height:0;border-radius:14px;
+  border:1px solid #355365;padding:19px;gap:18px;
+  background:linear-gradient(115deg,#1a384a,#152839 75%);
+}
+.spotlight-info{overflow:hidden}
+.spotlight-info h2{font-size:clamp(18px,2.1vw,25px);line-height:1.25;max-width:100%}
+.spotlight-tags{max-width:100%}
+.spotlight-art{flex-shrink:0}
+.library-row-art,.spotlight-art,.quick-game-media,.server-context-art{isolation:isolate}
+.library-row-art .game-art,.spotlight-art .game-art,.quick-game-media .game-art,.server-context-art .game-art{width:100%;height:100%}
+.quick-game-title{overflow-wrap:anywhere}
+.game-row-name{min-width:0;overflow:hidden}
+.game-row:focus-visible{outline:2px solid #9ae7ee;outline-offset:2px}
+.detail-actions{align-items:center;gap:8px}
+.detail-actions .btn{white-space:normal;text-align:center;min-height:37px}
+.subplace-row{min-width:0}
+.subplace-row>div:first-child{min-width:0;flex:1}
+.subplace-row strong,.subplace-row small{overflow-wrap:anywhere}
+.subplace-row .row-actions{flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:1130px){
+  .library-layout{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:620px){
+  .game-spotlight{margin:0;padding:14px;gap:11px;border-radius:12px}
+  .spotlight-art{width:76px;height:76px;flex-basis:76px;border-radius:14px}
+  .spotlight-info h2{font-size:18px}
+  .spotlight-tags{gap:5px}
+  .quick-game-kind{max-width:calc(100% - 45px);font-size:7px;padding:4px}
+  .library-row-art{width:47px;height:47px;flex-basis:47px}
+  .game-row{min-height:65px;padding:8px}
+  .subplace-row{flex-wrap:wrap;align-items:flex-start}
+  .subplace-row .row-actions{width:100%;justify-content:flex-start}
+}
