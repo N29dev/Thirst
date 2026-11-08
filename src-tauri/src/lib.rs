@@ -307,6 +307,7 @@ pub fn run() {
             platform_name,
             auth::begin_roblox_consent,
             auth::open_roblox_login,
+            auth::reload_roblox_login,
             auth::finish_roblox_login,
             auth::connected_roblox_account,
             auth::disconnect_roblox_account,
