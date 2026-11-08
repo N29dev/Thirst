@@ -36,7 +36,7 @@ This document tracks features requested during the first successful macOS alpha 
 - [ ] Investigate allowed RoValra integration or licensed provider access; don't scrape or redistribute service data without permission.
 - [ ] Optional initial ~5 player avatar thumbnails **when** a public Roblox token/thumbnail API supports it. This should not attempt to identify players from tokens.
 - [ ] Opt-in friends-in-server indicator, **only when** authorized presence data is accessible and players' Roblox visibility settings permit it.
-- [ ] Filters for region (with source/confidence), free slots, ping, FPS, version, and recent/favorite servers.
+- [ ] Filters for region (with source/confidence), free slots, ping, version, and recent/favorite servers. Keep server FPS out of the default list; it does not represent player FPS.
 - [ ] Use caching, pagination, throttling and timeouts to prevent unnecessary rate limiting.
 
 ## Alpha 0.5+ — Wider feature parity

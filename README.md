@@ -12,7 +12,7 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 - Save favorite Roblox experiences using place IDs or official game URLs. Thirst retrieves their public names and icons on demand, with manual-name fallback.
 - Save and launch individual subplaces under an experience, or discover publicly listed places on demand (with pagination).
 - Quickly launch saved experiences **and individually pinned subplaces** directly from the Overview grid (up to 24 tiles). Use the star next to a saved subplace to pin/unpin it; the tile's server button goes straight to that subplace's public servers.
-- Fetch public Roblox servers on demand with player counts, Roblox-reported ping and FPS, pagination, and instance-specific launch links.
+- Fetch public Roblox servers on demand with player counts, Roblox-reported ping, pagination, and instance-specific launch links. Server FPS is deliberately omitted from the browser because it does not predict a player's game FPS.
 - Launch Roblox using its registered desktop deep-link protocol on macOS or Windows.
 - Keep bookmarks and preferences locally. No Thirst account, telemetry, or background polling.
 - Optional **AppleBlox-style** Roblox session login: a 15-second Rust consent gate; on macOS, a separate **Swift/WKWebView helper** with non-persistent storage, automatic native cookie detection and a temporary Keychain entry; on Windows, an isolated Tauri webview. Native code verifies the cookie with Roblox before storing the primary credential. On macOS the app automatically finishes once the helper closes successfully; manual Finish remains available as a fallback. No cookie is returned to Svelte.

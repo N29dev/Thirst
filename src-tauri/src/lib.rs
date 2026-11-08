@@ -14,8 +14,6 @@ struct PublicServer {
     max_players: u32,
     #[serde(default)]
     ping: Option<f64>,
-    #[serde(default)]
-    fps: Option<f64>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]

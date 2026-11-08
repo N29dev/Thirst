@@ -687,13 +687,12 @@
             <button class="btn primary" disabled={!activePlaceId || loading} onclick={() => loadServers(false)}>{loading ? "Loading…" : "↻ Refresh"}</button>
           </div>
           <div class="server-disclaimer">Ping shown below is reported by Roblox for each server, <strong>not your personal network ping.</strong> Public server data and pagination can be incomplete or rate-limited.</div>
-          <div class="table-head"><span>SERVER</span><span>PLAYERS</span><span>PING</span><span>FPS</span><span></span></div>
+          <div class="table-head"><span>SERVER</span><span>PLAYERS</span><span>PING</span><span></span></div>
           {#each servers as server (server.id)}
             <div class="server-row">
               <span class="server-id"><span class="online-dot"></span>{server.id.slice(0, 8)}…</span>
               <span><strong>{server.playing}</strong><span class="muted"> / {server.maxPlayers}</span></span>
               <span>{server.ping === null ? "—" : Math.round(server.ping) + " ms"}</span>
-              <span>{server.fps === null ? "—" : server.fps.toFixed(0)}</span>
               <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join ↗</button>
             </div>
           {:else}

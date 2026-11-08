@@ -37,7 +37,6 @@ export type PublicServer = {
   playing: number;
   maxPlayers: number;
   ping: number | null;
-  fps: number | null;
 };
 
 export type ServerPage = {
