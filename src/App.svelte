@@ -42,6 +42,8 @@
   let serverSearch = "";
   let serverLoadError = "";
   let autoAvatarEnabled = true;
+  // Deliberately NOT persisted. Full-session credentials require fresh opt-in per app run.
+  let useAuthenticatedAvatarRequests = false;
   let bulkPreviewBusy = false;
   let bulkPreviewRequested: string[] = [];
   let bulkPreviewError = "";
@@ -248,6 +250,7 @@
     try {
       await disconnectRobloxAccount();
       connectedAccount = null;
+      useAuthenticatedAvatarRequests = false;
       bulkPreviewVersion++;
       avatarPreviews = {};
       accountStatusLoaded = true;
@@ -526,7 +529,10 @@
     loading = true;
     serverLoadError = "";
     try {
-      const result = await fetchPublicServers(requestedPlace, loadMore ? nextCursor : null);
+      const result = await fetchPublicServers(
+        requestedPlace, loadMore ? nextCursor : null,
+        useAuthenticatedAvatarRequests && connectedAccount !== null
+      );
       // If the selected subplace changes while a request is outstanding, ignore
       // the old result rather than mixing server lists from two places.
       if (activePlaceId !== requestedPlace) return;
@@ -574,7 +580,7 @@
     bulkPreviewRequested = ids;
     bulkPreviewError = "";
     try {
-      const result = await fetchServerAvatarPreviews(placeId, ids);
+      const result = await fetchServerAvatarPreviews(placeId, ids, useAuthenticatedAvatarRequests && connectedAccount !== null);
       if (activePlaceId !== placeId || version !== bulkPreviewVersion) return;
       const cleaned: Record<string, string[]> = {};
       for (const id of ids) {
@@ -593,6 +599,23 @@
       // server batch once the previous network request has settled.
       if (wasSuperseded && tab === "servers") void loadAutomaticAvatars();
     }
+  }
+
+  function setAuthenticatedAvatars(enabled: boolean) {
+    if (enabled && !connectedAccount) {
+      notice("Verify your Roblox account in Settings before using its saved session.", "bad");
+      return;
+    }
+    useAuthenticatedAvatarRequests = enabled;
+    // Never persist session-backed request permission. Re-authorize after restart.
+    avatarPreviews = {};
+    avatarErrors = {};
+    bulkPreviewError = "";
+    bulkPreviewVersion++;
+    bulkPreviewRequested = [];
+    notice(enabled
+      ? "Authenticated Roblox server/thumbnail requests enabled for this app session. Click Refresh to test."
+      : "Authenticated avatar requests disabled. Public mode will be used.");
   }
 
   function setAutoAvatarEnabled(enabled: boolean) {
@@ -614,7 +637,7 @@
         avatarErrors[serverId] || previewLoadingId === serverId) return;
     previewLoadingId = serverId;
     try {
-      const urls = await fetchServerAvatarPreview(placeId, serverId);
+      const urls = await fetchServerAvatarPreview(placeId, serverId, useAuthenticatedAvatarRequests && connectedAccount !== null);
       if (activePlaceId !== placeId) return;
       avatarPreviews = { ...avatarPreviews, [serverId]: urls.filter(isTrustedIconUrl).slice(0, 5) };
     } catch (error) {
@@ -865,7 +888,7 @@
             <span>{visibleServers.length} shown / {servers.length} loaded · Region: <strong>Unknown</strong></span>
             <button class="link-button" onclick={() => { serverSort = "default"; serverMaxPing = "any"; serverHideFull = false; serverSearch = ""; }}>Clear filters</button>
             {#if serverLoadError}<span class="server-error">Last request failed: {serverLoadError}</span>{/if}
-            {#if bulkPreviewError}<span class="preview-error" title={bulkPreviewError}>Automatic avatars unavailable; manual preview remains available.</span>{/if}
+            {#if bulkPreviewError}<span class="preview-error">Avatar preview issue: {bulkPreviewError}</span>{/if}
           </div>
           <div class="table-head"><span>SERVER</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
           {#each visibleServers as server (server.id)}
@@ -913,7 +936,8 @@
         <div class="page-title"><div><span class="eyebrow">PREFERENCES & PRIVACY</span><h1>Settings</h1><p>Personalize Thirst without compromising performance.</p></div></div>
         <div class="settings-column">
           <section class="panel settings-panel"><div><h3>Lite Mode</h3><p>Disable decorative gradients and transitions to reduce UI overhead.</p></div><label class="switch"><input type="checkbox" checked={liteMode} onchange={e => setLiteMode(e.currentTarget.checked)} /><span class="slider"></span></label></section> 
-          <section class="panel settings-panel"><div><h3>Automatic server avatars</h3><p>When a Roblox account is connected, load up to five anonymous public avatars for each of the first eight servers in one batch after Refresh. No Roblox cookies are sent with thumbnail requests. Disabled in Lite Mode.</p></div><label class="switch"><input type="checkbox" checked={autoAvatarEnabled} onchange={e => setAutoAvatarEnabled(e.currentTarget.checked)} /><span class="slider"></span></label></section>
+          <section class="panel settings-panel"><div><h3>Automatic server avatars</h3><p>When connected, request up to five anonymous avatars for each of the first eight servers after Refresh. Guest mode stays manual. Disabled in Lite Mode.</p></div><label class="switch"><input type="checkbox" checked={autoAvatarEnabled} onchange={e => setAutoAvatarEnabled(e.currentTarget.checked)} /><span class="slider"></span></label></section>
+          <section class="panel settings-panel"><div><h3>Use saved Roblox session for server avatars</h3><p><strong>Experimental · off by default.</strong> When enabled, native Rust sends your full-access .ROBLOSECURITY cookie only to <code>games.roblox.com</code> for the selected server list and <code>thumbnails.roblox.com</code> for avatar previews. It is never sent to Thirst, RoValra, CDN hosts, or UI scripts. This may prompt macOS Keychain, does not guarantee avatars will appear, and does not bypass Roblox rate limits. Permission resets whenever Thirst restarts. Click Refresh after enabling.</p></div><label class="switch"><input type="checkbox" disabled={!connectedAccount} checked={useAuthenticatedAvatarRequests} onchange={e => setAuthenticatedAvatars(e.currentTarget.checked)} /><span class="slider"></span></label></section>
           <section class="panel settings-panel account-settings">
             <div class="account-info">
               <h3>Roblox account</h3>
@@ -958,7 +982,7 @@
           <div class="consent-disclosure">
             <div><strong>What Thirst will access</strong><p>A Roblox session cookie from an isolated sign-in window. A stolen copy may let someone access your account without your password or 2-step verification.</p></div>
             <div><strong>Where it will be stored</strong><p>Locally using macOS Keychain or Windows Credential Manager, not in browser localStorage, project files, logs or cloud storage.</p></div>
-            <div><strong>Where it will be sent</strong><p>Only to the fixed Roblox verification endpoint when you choose to connect or check your session. No Thirst, RoValra or Discord server receives it.</p></div>
+            <div><strong>Where it will be sent</strong><p>Normally only to Roblox's fixed account-verification endpoint. If you separately enable authenticated server avatars in Settings, native Rust also sends it to fixed games.roblox.com and thumbnails.roblox.com endpoints. No Thirst, RoValra or Discord server receives it.</p></div>
             <div><strong>Important limitations</strong><p>Native local malware or a compromised launcher build could still steal a cookie. This is an experimental feature and is not independently security-audited.</p></div>
           </div>
           <label class="consent-confirm">
