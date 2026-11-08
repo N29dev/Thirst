@@ -211,11 +211,17 @@ pub async fn open_roblox_login(
         return Err("Read and acknowledge the Roblox cookie warning before proceeding.".into());
     }
     let accepted = {
-        let started = state.started.lock().map_err(|_| "Consent state unavailable.".to_owned())?;
-        started.as_ref().is_some_and(|time| time.elapsed() >= Duration::from_secs(CONSENT_SECS))
+        let mut started = state.started.lock().map_err(|_| "Consent state unavailable.".to_owned())?;
+        let approved = started.as_ref().is_some_and(|time| time.elapsed() >= Duration::from_secs(CONSENT_SECS));
+        // Every consent is single-use: an earlier approval cannot silently
+        // authorize a future cookie capture without another warning.
+        if approved {
+            *started = None;
+        }
+        approved
     };
     if !accepted {
-        return Err("The 15-second consent review has not finished.".into());
+        return Err("A fresh 15-second consent review is required before Roblox sign-in.".into());
     }
     #[cfg(target_os = "macos")]
     {
