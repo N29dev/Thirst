@@ -3,7 +3,7 @@
   import {
     beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
     disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview, fetchServerAvatarPreviews,
-    finishRobloxLogin, launchPlace, lookupGame, openRobloxLogin, platformName, pollRobloxLoginStatus
+    finishRobloxLogin, launchPlace, lookupGame, lookupRoValraRegions, openRobloxLogin, platformName, pollRobloxLoginStatus
   } from "./lib/backend";
   import type { ConnectedAccount } from "./lib/backend";
   import { isTrustedIconUrl, parsePlaceId, readAutoAvatarPreviews, readLibrary, readLibrarySort, readLiteMode, writeAutoAvatarPreviews, writeLibrary, writeLibrarySort, writeLiteMode } from "./lib/library";
@@ -12,10 +12,10 @@
   import type { ServerSort } from "./lib/servers";
   import type { LibrarySort } from "./lib/library";
   import {
-    REGION_OPTIONS, readRegionReports, regionLabel, reportForServer,
+    REGION_OPTIONS, providerRegionLabel, readRegionReports, regionLabel, reportForServer,
     withRegionReport, withoutRegionReport, writeRegionReports
   } from "./lib/regions";
-  import type { LocalRegionReport, RegionCode, RegionFilter } from "./lib/regions";
+  import type { LocalRegionReport, ProviderRegion, RegionCode, RegionFilter } from "./lib/regions";
 
   type Tab = "home" | "library" | "servers" | "settings";
   type QuickLaunchItem = {
@@ -49,6 +49,12 @@
   let serverSearch = "";
   let regionFilter: RegionFilter = "any";
   let regionReports: LocalRegionReport[] = [];
+  // Provider access is a session-only opt-in. It never reads Roblox credentials
+  // and is not used until explicitly enabled by the user.
+  let rovalraEnabled = false;
+  let rovalraLoading = false;
+  let rovalraError = "";
+  let providerRegions: Record<string, ProviderRegion> = {};
   let editingRegionId: string | null = null;
   let regionDraft: RegionCode | "" = "";
   let serverLoadError = "";
@@ -95,7 +101,7 @@
     sort: serverSort, hideFull: serverHideFull,
     maxPing: serverMaxPing === "any" ? null : Number(serverMaxPing),
     search: serverSearch, region: regionFilter
-  }, regionReports, activePlaceId);
+  }, regionReports, activePlaceId, providerRegions);
 
   $: filteredGames = games
     .filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
@@ -471,6 +477,8 @@
     serverLoadError = "";
     editingRegionId = null;
     regionDraft = "";
+    providerRegions = {};
+    rovalraError = "";
     expandedPreviewId = null;
     previewLoadingId = null;
     avatarPreviews = {};
@@ -522,6 +530,8 @@
     serverLoadError = "";
     editingRegionId = null;
     regionDraft = "";
+    providerRegions = {};
+    rovalraError = "";
     expandedPreviewId = null;
     previewLoadingId = null;
     avatarPreviews = {};
@@ -547,13 +557,56 @@
     catch { notice("Could not save library sort preference.", "bad"); }
   }
 
+  function setRoValraEnabled(enabled: boolean) {
+    rovalraEnabled = enabled;
+    rovalraError = "";
+    providerRegions = {};
+    if (enabled) {
+      notice("RoValra API enabled for this run. Only public place and server IDs are shared. No cookies.");
+      if (activePlaceId && servers.length && !rovalraLoading) void loadRoValraRegions();
+    } else {
+      notice("RoValra lookups disabled. Your local region reports remain available.");
+    }
+  }
+
+  async function loadRoValraRegions() {
+    if (!rovalraEnabled || rovalraLoading || !activePlaceId || !servers.length) return;
+    const placeId = activePlaceId;
+    const ids = servers.slice(0, 25).map(server => server.id).filter(isValidServerId);
+    if (!ids.length) return;
+    rovalraLoading = true;
+    rovalraError = "";
+    try {
+      const response = await lookupRoValraRegions(placeId, ids);
+      if (!rovalraEnabled || activePlaceId !== placeId) return;
+      const allowed = new Set(ids.map(id => id.toLowerCase()));
+      const byId: Record<string, ProviderRegion> = {};
+      for (const item of response) {
+        const id = item.serverId.toLowerCase();
+        if (allowed.has(id) && item.source === "rovalra") byId[id] = item;
+      }
+      providerRegions = { ...providerRegions, ...byId };
+      notice("RoValra reported regions for " + Object.keys(byId).length + " loaded servers.");
+    } catch (error) {
+      if (rovalraEnabled && activePlaceId === placeId) {
+        rovalraError = String(error);
+        if (/did not permit|disabled region lookup/i.test(rovalraError)) {
+          rovalraEnabled = false;
+          providerRegions = {};
+        }
+      }
+    } finally {
+      rovalraLoading = false;
+    }
+  }
+
   function regionReportFor(serverId: string): LocalRegionReport | null {
     return reportForServer(regionReports, activePlaceId, serverId);
   }
 
   function displayServerRegion(serverId: string): string {
     const report = regionReportFor(serverId);
-    return report ? regionLabel(report.region) : "Unknown";
+    return report ? regionLabel(report.region) : providerRegionLabel(providerRegions[serverId.toLowerCase()]);
   }
 
   function editServerRegion(serverId: string) {
@@ -629,6 +682,8 @@
         previewLoadingId = null;
         avatarPreviews = {};
         avatarErrors = {};
+        providerRegions = {};
+        rovalraError = "";
         bulkPreviewVersion++;
         bulkPreviewRequested = [];
       }
@@ -644,6 +699,7 @@
         return age >= 0 && age < 2 * 60 * 60 * 1000;
       });
       if (!loadMore && connectedAccount) void loadAutomaticAvatars();
+      if (!loadMore && rovalraEnabled && !rovalraLoading) void loadRoValraRegions();
       if (!servers.length) notice("No public servers returned for this place.");
     } catch (error) {
       if (activePlaceId === requestedPlace) {
