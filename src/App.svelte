@@ -11,7 +11,8 @@
     disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview, fetchServerAvatarPreviews,
     finishRobloxLogin, launchPlace, lockRobloxSession, lookupGame, lookupRoValraRegions, openRobloxLogin, platformName, pollRobloxLoginStatus
   } from "./lib/backend";
-  import type { ConnectedAccount } from "./lib/backend";
+  import type { ConnectedAccount, ThirstUpdateCheck } from "./lib/backend";
+  import { checkThirstUpdate, openThirstReleases } from "./lib/backend";
   import { isTrustedIconUrl, parsePlaceId, readAutoAvatarPreviews, readLibrary, readLibrarySort, readLiteMode, readRoValraEnabled, writeAutoAvatarPreviews, writeLibrary, writeLibrarySort, writeLiteMode, writeRoValraEnabled } from "./lib/library";
   import type { DiscoveredPlace, GameMetadata, PublicServer, SavedGame, SavedPlace } from "./lib/types";
   import { filterAndSortServers, isValidServerId } from "./lib/servers";
@@ -32,6 +33,12 @@
     iconUrl?: string;
     isSubplace: boolean;
   };
+  const UPDATE_CHECK_KEY = "thirst.preferences.release-checks.v1";
+  let updateChecksEnabled = true;
+  let releaseCheck: ThirstUpdateCheck | null = null;
+  let releaseChecking = false;
+  let releaseCheckError = "";
+  let releaseCheckTimer: ReturnType<typeof setTimeout> | undefined;
   let tab: Tab = "home";
   let games: SavedGame[] = [];
   let recentLaunches: RecentLaunch[] = [];
@@ -155,6 +162,11 @@
     liteMode = readLiteMode();
     librarySort = readLibrarySort();
     autoAvatarEnabled = readAutoAvatarPreviews();
+    try { updateChecksEnabled = localStorage.getItem(UPDATE_CHECK_KEY) !== "off"; }
+    catch { updateChecksEnabled = false; }
+    if (updateChecksEnabled) {
+      releaseCheckTimer = setTimeout(() => void checkUpdates(true), 2500);
+    }
     platformName().then(value => platform = value).catch(() => platform = "Desktop");
     // Prevent a pending notification callback from outliving the desktop window.
     return () => {
@@ -162,8 +174,49 @@
       if (consentTimer) clearInterval(consentTimer);
       if (nativeLoginTimer) clearInterval(nativeLoginTimer);
       if (hoverFrame) cancelAnimationFrame(hoverFrame);
+      if (releaseCheckTimer) clearTimeout(releaseCheckTimer);
     };
   });
+
+  async function checkUpdates(silent = false) {
+    if (releaseChecking) return;
+    releaseChecking = true;
+    releaseCheckError = "";
+    try {
+      const result = await checkThirstUpdate();
+      releaseCheck = result;
+      if (result.updateAvailable) {
+        notice("Thirst " + result.latestVersion + " is available. Open Settings → Updates for details.");
+      } else if (!silent) {
+        notice(result.status === "no-releases"
+          ? "No official Thirst releases yet. Developer builds are available in GitHub Actions."
+          : "You're using the latest published Thirst version.");
+      }
+    } catch (reason) {
+      if (!silent) releaseCheckError = String(reason);
+    } finally {
+      releaseChecking = false;
+    }
+  }
+
+  function setUpdateChecksEnabled(enabled: boolean) {
+    updateChecksEnabled = enabled;
+    try {
+      localStorage.setItem(UPDATE_CHECK_KEY, enabled ? "on" : "off");
+      if (enabled) void checkUpdates(true);
+    } catch {
+      updateChecksEnabled = false;
+      notice("Could not save the automatic release-check preference.", "bad");
+    }
+  }
+
+  async function openUpdatesPage() {
+    try {
+      await openThirstReleases();
+    } catch (reason) {
+      notice(String(reason), "bad");
+    }
+  }
 
   async function loadConnectedAccount() {
     if (checkingAccount) return;
@@ -1355,6 +1408,41 @@
       {:else}
         <div class="page-title"><div><span class="eyebrow">PREFERENCES & PRIVACY</span><h1>Settings</h1><p>Personalize Thirst without compromising performance.</p></div></div>
         <div class="settings-column">
+          <section class="panel settings-panel update-panel">
+            <div class="update-panel-info">
+              <h3>Thirst updates</h3>
+              <p>Check GitHub Releases for a newer version of Thirst. Checks happen once after startup, not continuously, and never include your Roblox credentials.</p>
+              <div class="update-status" role="status">
+                {#if releaseChecking}
+                  Checking for a release…
+                {:else if releaseCheck?.updateAvailable}
+                  Update available: v{releaseCheck.latestVersion} (installed: v{releaseCheck.currentVersion})
+                {:else if releaseCheck?.status === "up-to-date"}
+                  Up to date · v{releaseCheck.currentVersion}
+                {:else if releaseCheck?.status === "no-releases"}
+                  No official release published yet. Current builds are developer previews.
+                {:else}
+                  No release check has been performed.
+                {/if}
+              </div>
+              {#if releaseCheckError}
+                <p class="account-error">{releaseCheckError}</p>
+              {/if}
+              {#if releaseCheck?.updateAvailable && releaseCheck.notes}
+                <p class="update-notes">{releaseCheck.notes}</p>
+              {/if}
+              <div class="update-buttons">
+                <button class="btn secondary" disabled={releaseChecking} onclick={() => void checkUpdates()}>
+                  {releaseChecking ? "Checking…" : "↻ Check now"}
+                </button>
+                <button class="btn primary" onclick={openUpdatesPage}>
+                  {releaseCheck?.updateAvailable ? "View update on GitHub ↗" : "GitHub releases ↗"}
+                </button>
+              </div>
+              <p class="update-disclaimer">For now, installation is manual. Automatic installation requires a signed Tauri update channel, which has not been configured yet. Thirst never installs an unsigned Actions artifact.</p>
+            </div>
+            <label class="switch" title="Check for new versions when Thirst starts"><input type="checkbox" checked={updateChecksEnabled} onchange={e => setUpdateChecksEnabled(e.currentTarget.checked)}/><span class="slider"></span></label>
+          </section>
           <section class="panel settings-panel"><div><h3>Lite Mode</h3><p>Disable decorative gradients and transitions to reduce UI overhead.</p></div><label class="switch"><input type="checkbox" checked={liteMode} onchange={e => setLiteMode(e.currentTarget.checked)} /><span class="slider"></span></label></section> 
           <section class="panel settings-panel"><div><h3>Automatic server avatars</h3><p>When connected, request up to five anonymous avatars for each of the first eight servers after Refresh. Guest mode stays manual. Disabled in Lite Mode.</p></div><label class="switch"><input type="checkbox" checked={autoAvatarEnabled} onchange={e => setAutoAvatarEnabled(e.currentTarget.checked)} /><span class="slider"></span></label></section>
           <section class="panel settings-panel"><div><h3>Use saved Roblox session for server avatars</h3><p><strong>Experimental · off by default.</strong> When enabled, native Rust sends your full-access .ROBLOSECURITY cookie only to <code>games.roblox.com</code> for the selected server list and <code>thumbnails.roblox.com</code> for avatar previews. It is never sent to Thirst, RoValra, CDN hosts, or UI scripts. This may prompt macOS Keychain, does not guarantee avatars will appear, and does not bypass Roblox rate limits. Permission resets whenever Thirst restarts. Click Refresh after enabling.</p></div><label class="switch"><input type="checkbox" disabled={!connectedAccount} checked={useAuthenticatedAvatarRequests} onchange={e => setAuthenticatedAvatars(e.currentTarget.checked)} /><span class="slider"></span></label></section>
