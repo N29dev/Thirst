@@ -1,5 +1,7 @@
 //! Native Thirst API. The UI cannot pass arbitrary URLs or shell commands.
-//! There is no session-cookie access in this early developer preview.
+//! Session credentials are isolated in auth.rs, never returned over Tauri IPC.
+
+mod auth;
 
 use std::time::Duration;
 use tauri_plugin_opener::OpenerExt;
@@ -295,13 +297,20 @@ async fn discover_subplaces(
 
 pub fn run() {
     tauri::Builder::default()
+        .manage(auth::AuthState::default())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             launch_place,
             list_public_servers,
             lookup_game,
             discover_subplaces,
-            platform_name
+            platform_name,
+            auth::begin_roblox_consent,
+            auth::open_roblox_login,
+            auth::finish_roblox_login,
+            auth::connected_roblox_account,
+            auth::disconnect_roblox_account,
+            auth::cancel_roblox_login
         ])
         .run(tauri::generate_context!())
         .expect("error while starting Thirst");

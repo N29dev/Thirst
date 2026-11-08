@@ -77,7 +77,7 @@ fn rotated_cookie(headers: &reqwest::header::HeaderMap) -> Option<String> {
     // Roblox may rotate .ROBLOSECURITY in an HTTP Set-Cookie header.
     // Only trust cookies from the *fixed* authenticated users.roblox.com host
     // (this function must never be used with a redirect-following client).
-    for header in headers.get_all(SET_COOKIE) {
+    for header in headers.get_all(SET_COOKIE).iter() {
         let Ok(text) = header.to_str() else { continue };
         let Some(value) = text.split(';').next()
             .and_then(|cookie| cookie.trim().strip_prefix(".ROBLOSECURITY=")) else { continue };
