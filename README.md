@@ -8,6 +8,7 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 
 ## What works now
 
+- **Branded app icon:** a custom neon droplet source at `src-tauri/icons/thirst.svg`, automatically converted to a native macOS `.icns`, Windows `.ico`, and retina PNG variants before dev/build. The same artwork appears in the sidebar. The bundle workflow verifies that the macOS app actually includes its icon. New builds must replace older installed apps; the Dock may cache the old placeholder.
 - **Refined desktop interface:** matching SVG navigation icons and clear active-page indicators, short screen-entry and card-reveal transitions, polished hover/press feedback, more readable panel hierarchy, responsive server-loading skeletons, and visible keyboard focus. No continuously animated wallpaper or network fonts. **Lite Mode and reduced-motion preferences disable decorative motion**; performance remains the priority. See [Visual design notes](docs/VISUALS.md).
 - Save favorite Roblox experiences using place IDs or official game URLs. Thirst retrieves their public names and icons on demand, with manual-name fallback.
 - Sort My Library by saved order, name A–Z, newest or oldest. **Import/export library backups** as JSON; imports merge saved games and pinned subplaces. Local-only, no cookies or Roblox credentials.
