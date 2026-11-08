@@ -254,6 +254,34 @@ pub async fn open_roblox_login(
     }
 }
 
+/// Only the state string crosses IPC; the cookie stays in Keychain.
+/// Used exclusively for a brief, user-initiated macOS login attempt.
+#[tauri::command]
+pub fn roblox_login_status(state: State<'_, AuthState>) -> Result<&'static str, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut lock = state.helper.lock()
+            .map_err(|_| "Could not inspect the native login helper.".to_owned())?;
+        let Some(child) = lock.as_mut() else { return Ok("not-started") };
+        match child.try_wait().map_err(|_| "Could not inspect native login completion.".to_owned())? {
+            None => Ok("waiting"),
+            Some(_) => {
+                drop(lock);
+                if read_pending_session()?.is_some() {
+                    Ok("ready")
+                } else {
+                    Ok("cancelled")
+                }
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = state;
+        Ok("manual")
+    }
+}
+
 /// Retry an incomplete embedded login without relaxing navigation restrictions.
 /// Does not access, transmit, or disclose any session cookie.
 #[tauri::command]
