@@ -492,7 +492,7 @@
         <div class="settings-column">
           <section class="panel settings-panel"><div><h3>Lite Mode</h3><p>Disable decorative gradients and transitions to reduce UI overhead.</p></div><label class="switch"><input type="checkbox" checked={liteMode} onchange={e => setLiteMode(e.currentTarget.checked)} /><span class="slider"></span></label></section>
           <section class="panel settings-panel"><div><h3>Roblox account</h3><p>AppleBlox-style browser login is planned, but not enabled until session isolation and native credential storage are audited. Never paste your .ROBLOSECURITY cookie into the launcher.</p><span class="chip">NOT CONNECTED · COMING LATER</span></div><span class="settings-icon">♙</span></section>
-          <section class="panel settings-panel"><div><h3>Network behavior</h3><p>No background polling. Public server requests run from Rust against a fixed Roblox host; there is no Thirst backend or analytics service.</p><span class="chip">LOCAL-FIRST</span></div><span class="settings-icon">◎</span></section>
+          <section class="panel settings-panel"><div><h3>Network behavior</h3><p>No background polling. On-demand requests use fixed Roblox API hosts in Rust; approved game icons load from Roblox CDN. No Thirst backend or analytics service.</p><span class="chip">LOCAL-FIRST</span></div><span class="settings-icon">◎</span></section>
           <section class="panel settings-panel"><div><h3>Early development</h3><p>Thirst Alpha 0.1.0 · Native macOS and Windows builds require platform testing. Features from AppleBlox/Lunar will be added incrementally.</p></div><span class="settings-icon">◈</span></section>
         </div>
       {/if}
