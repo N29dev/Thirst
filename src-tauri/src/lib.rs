@@ -328,6 +328,7 @@ pub fn run() {
             activity::recent_player_sessions,
             updates::check_thirst_update,
             updates::open_thirst_releases,
+            updates::open_thirst_dev_builds,
             list_public_servers,
             rovalra::lookup_rovalra_regions,
             server_previews::server_avatar_preview,
