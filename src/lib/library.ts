@@ -73,6 +73,19 @@ export function writeAutoAvatarPreviews(enabled: boolean): void {
   localStorage.setItem(AUTO_AVATAR_KEY, enabled ? "on" : "off");
 }
 
+// Region lookups send only public place/server IDs (plus the ordinary HTTPS
+// source IP) to RoValra. Enabled by default when users manually refresh a
+// server list; opting out persists locally. Never store credentials here.
+const ROVALRA_ENABLED_KEY = "thirst.preferences.rovalra-regions.v1";
+
+export function readRoValraEnabled(): boolean {
+  return localStorage.getItem(ROVALRA_ENABLED_KEY) !== "off";
+}
+
+export function writeRoValraEnabled(enabled: boolean): void {
+  localStorage.setItem(ROVALRA_ENABLED_KEY, enabled ? "on" : "off");
+}
+
 // Non-sensitive UI preference, independent of the order in which bookmarks
 // are stored. The default is the existing saved order.
 const LIBRARY_SORT_KEY = "thirst.preferences.library-sort.v1";
