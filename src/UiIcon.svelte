@@ -1,5 +1,5 @@
 <script lang="ts">
-  export type IconName = "home" | "library" | "server" | "flags" | "settings" | "play" | "arrow-up-right" | "sparkles" | "refresh" | "search";
+  type IconName = "home" | "library" | "server" | "flags" | "settings" | "play" | "arrow-up-right" | "sparkles" | "refresh" | "search";
   export let name: IconName;
   export let size = 20;
   export let stroke = 1.8;
