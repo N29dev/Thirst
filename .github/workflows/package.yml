@@ -34,17 +34,23 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build macOS app including native Roblox login
         run: npm run bundle:mac
-      - name: Inspect bundled login helper
+      - name: Verify macOS bundle and nested helper signatures
         run: |
-          test -x src-tauri/target/release/bundle/macos/Thirst.app/Contents/Resources/resources/ThirstLogin
-          file src-tauri/target/release/bundle/macos/Thirst.app/Contents/Resources/resources/ThirstLogin
-      - name: Archive unsigned macOS app
+          APP="src-tauri/target/release/bundle/macos/Thirst.app"
+          HELPER="$APP/Contents/Resources/resources/ThirstLogin"
+          test -x "$HELPER"
+          file "$APP/Contents/MacOS/thirst" "$HELPER"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign --verify --strict --verbose=2 "$HELPER"
+          codesign -dv --verbose=2 "$APP" 2>&1 | grep -E "Signature=adhoc|Authority=|Identifier="
+          echo "Ad-hoc signatures are valid; Apple notarization is not included."
+      - name: Archive ad-hoc signed macOS test app
         run: |
           cd src-tauri/target/release/bundle/macos
           ditto -c -k --sequesterRsrc --keepParent Thirst.app "$GITHUB_WORKSPACE/Thirst-macOS-arm64.zip"
       - uses: actions/upload-artifact@v4
         with:
-          name: Thirst-macOS-arm64-unsigned
+          name: Thirst-macOS-arm64-ad-hoc
           path: Thirst-macOS-arm64.zip
           if-no-files-found: error
 
