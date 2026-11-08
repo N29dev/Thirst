@@ -151,10 +151,12 @@
     discoveryBusy = true;
     try {
       let universeId = selectedGame.universeId;
+      let rootPlaceId = selectedGame.rootPlaceId ?? selectedGame.placeId;
       if (!universeId) {
         const metadata = await lookupGame(selectedGame.placeId);
         if (selectedId !== id) return;
         universeId = metadata.universeId;
+        rootPlaceId = metadata.rootPlaceId;
         games = games.map(game => game.placeId === id ? {
           ...game, universeId: metadata.universeId, rootPlaceId: metadata.rootPlaceId,
           iconUrl: isTrustedIconUrl(metadata.iconUrl) ? metadata.iconUrl : game.iconUrl
@@ -164,7 +166,7 @@
       const result = await discoverSubplaces(universeId, loadMore ? discoveryCursor : null);
       if (selectedId !== id) return;
       const incoming = result.data.filter(place =>
-        place.id !== selectedGame.placeId && place.id !== (selectedGame.rootPlaceId ?? selectedGame.placeId));
+        place.id !== selectedGame.placeId && place.id !== rootPlaceId);
       discoveredPlaces = loadMore ?
         [...discoveredPlaces, ...incoming.filter(place => !discoveredPlaces.some(old => old.id === place.id))] :
         incoming;
