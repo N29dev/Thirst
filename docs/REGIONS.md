@@ -4,7 +4,7 @@
 
 Thirst includes an **experimental region integration, enabled by default when you manually refresh a server list**, that requests reported server regions from [RoValra](https://www.rovalra.com/). You can disable it in Server Browser; this opt-out is stored locally and respected after restart. No request is made solely from starting the launcher. RoValra is independent of Thirst. **Region data by RoValra** is credited in the app. Thirst is a desktop launcher and does not attempt to replace RoValra's browser extension. The provider's [API Terms of Use](https://www.rovalra.com/tou/) restrict competitive uses, require credits and permit access to be blocked without notice; RoValra has not individually endorsed or approved this specific integration. If the provider asks Thirst to stop, the integration can be disabled and removed.
 
-When the **RoValra regions (default on)** switch is enabled and you manually refresh a server list, Thirst sends public IDs to an approved, fixed HTTPS endpoint. For BL:R 8v8, Pro and Main, it first checks Glutony's shared cache at `https://glutony.scp343hey.workers.dev/api/servers/regions/shared?mode=...&ids=...`. This reads locations shared with the BL:R website and Discord bot. Glutony can resolve unknown IDs from its **recent public server sample** through RoValra, then store sanitized short-lived results in D1 (positive cache 3 minutes; missing 45 seconds). For public IDs outside that sample, Thirst falls back to `https://apis.rovalra.com/v1/servers/details`; these fallback results are not uploaded to Glutony. Non-BL:R games also use RoValra directly.
+When the **RoValra regions (default on)** switch is enabled and you manually refresh a server list, Thirst sends public IDs to an approved, fixed HTTPS endpoint. For BL:R 8v8, Pro and Main, it first checks Glutony's guarded read-through cache at `https://glutony.scp343hey.workers.dev/api/servers/regions/lookup?mode=...&ids=...`. This reads locations shared with the BL:R website and Discord bot. **When a server UUID is not in Glutony's database, even if it isn't in Glutony's current public sample, the Worker can query RoValra and write the result to D1.** Positive results expire after 3 minutes; missing results after 45 seconds. The Worker permits up to 25 new public-ID lookups per caller per minute, using an HMAC-pseudonymous caller quota. If Cloudflare has not deployed this endpoint, a quota is reached, or RoValra is unavailable, Thirst still tries `https://apis.rovalra.com/v1/servers/details` directly. Direct fallback results are not written to D1; the guarded Worker lookup is the cache-populating path. Non-BL:R games also use RoValra directly.
 
 Both request paths contain only:
 - The public numeric Roblox place ID
@@ -16,7 +16,7 @@ Thirst limits requests to one per 30 seconds, increasing to two minutes on a 429
 
 ## Glutony Worker deployment
 
-This requires `migrations/0007_shared_server_regions.sql` in [N29dev/Glutony](https://github.com/N29dev/Glutony). Apply the migration to the existing D1 database from a Cloudflare-authenticated terminal:
+This requires both `migrations/0007_shared_server_regions.sql` and `migrations/0008_shared_region_lookup_quota.sql` in [N29dev/Glutony](https://github.com/N29dev/Glutony). Apply both migrations to the existing D1 database from a Cloudflare-authenticated terminal:
 
 ```bash
 npx wrangler d1 migrations apply glutony-customs --remote
@@ -24,7 +24,7 @@ npx wrangler d1 migrations apply glutony-customs --remote
 
 Normal Glutony deployment and Discord interaction registration do not apply D1 migrations. Until it is applied, the Worker keeps its existing in-memory RoValra caching behavior, and Thirst's direct fallback still functions.
 
-No Cloudflare/Discord/Roblox token should be embedded in Thirst to authorize a shared read. The Worker endpoint only accepts public UUIDs present in a recent public server sample. If the provider's terms restrict this shared use, the provider integration must be disabled or replaced with an authorized source.
+No Cloudflare/Discord/Roblox token should be embedded in Thirst. The new Worker endpoint accepts only the three configured BL:R modes and up to 25 valid public instance UUIDs; on cache misses, it applies an atomic per-caller quota before querying RoValra. It never accepts submitted region values. The Worker uses the existing secret only to HMAC-pseudonymize the caller's IP for rate limiting; raw IP addresses are not stored in D1. Results are reusable by the website and Discord bot when they encounter those same UUIDs. If the provider's terms restrict this shared use, the provider integration must be disabled or replaced with an authorized source.
 
 ## Your own temporary region reports
 
