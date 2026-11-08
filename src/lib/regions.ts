@@ -28,6 +28,55 @@ export const REGION_REPORT_TTL_MS = 2 * 60 * 60 * 1000;
 const MAX_REPORTS = 200;
 const STORAGE_KEY = "thirst.region-reports.v1";
 
+// RoValra's API provides reported city/region/country values for Roblox
+// server UUIDs. The country-to-continent grouping below is our own UI mapping;
+// unknown/ambiguous codes remain Unknown and are never inferred from ping.
+export type ProviderRegion = {
+  serverId: string;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  source: "rovalra";
+};
+
+const COUNTRY_GROUPS: Record<RegionCode, string[]> = {
+  NA: "US CA MX GT BZ HN SV NI CR PA CU DO HT JM BS BB TT AG DM GD KN LC VC PR".split(" "),
+  EU: "AL AD AT BY BE BA BG HR CZ DK EE FI FR DE GR HU IS IE IT XK LV LI LT LU MT MD MC NL MK NO PL PT RO SM RS SK SI ES SE CH UA GB VA".split(" "),
+  SA: "BR AR BO CL CO EC PY PE UY VE GY SR GF FK".split(" "),
+  AS: "CN JP KR KP TW HK MO SG MY TH VN PH ID IN BD PK LK NP KH LA MM MN KZ UZ KG TJ TM AF BT MV BN TL AZ AM GE".split(" "),
+  OC: "AU NZ FJ PG WS TO VU SB FM MH PW NR KI TV".split(" "),
+  ME: "AE SA QA BH KW OM YE IR IQ IL JO LB SY TR PS".split(" "),
+  AF: "DZ AO BJ BW BF BI CM CV CF TD KM CD CG CI DJ EG GQ ER ET GA GM GH GN GW KE LS LR LY MG MW ML MR MU MA MZ NA NE NG RW ST SN SC SL SO ZA SS SD SZ TZ TG TN UG ZM ZW".split(" ")
+};
+
+const COUNTRY_ALIASES: Record<string, string> = {
+  "UNITED STATES": "US", "UNITED STATES OF AMERICA": "US", USA: "US",
+  "UNITED KINGDOM": "GB", UK: "GB",
+  "SOUTH KOREA": "KR", "REPUBLIC OF KOREA": "KR",
+  "UNITED ARAB EMIRATES": "AE", "SAUDI ARABIA": "SA",
+  "GERMANY": "DE", "FRANCE": "FR", "NETHERLANDS": "NL",
+  "SINGAPORE": "SG", "BRAZIL": "BR", "AUSTRALIA": "AU",
+  "JAPAN": "JP", "INDIA": "IN", "CANADA": "CA", "KAZAKHSTAN": "KZ"
+};
+
+export function providerBroadRegion(region: ProviderRegion | null | undefined): RegionCode | null {
+  if (!region?.country) return null;
+  const text = region.country.trim().toUpperCase();
+  const country = COUNTRY_ALIASES[text] ?? text;
+  for (const option of REGION_OPTIONS) {
+    if (COUNTRY_GROUPS[option.code].includes(country)) return option.code;
+  }
+  return null;
+}
+
+export function providerRegionLabel(region: ProviderRegion | null | undefined): string {
+  if (!region) return "Unknown";
+  const location = [region.city, region.region, region.country]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0);
+  const unique = [...new Set(location.map(item => item.trim()))];
+  return unique.length ? unique.join(", ") : "Unknown";
+}
+
 export function isRegionCode(value: unknown): value is RegionCode {
   return REGION_OPTIONS.some(option => option.code === value);
 }
