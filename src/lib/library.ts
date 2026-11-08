@@ -39,7 +39,11 @@ export function readLibrary(): SavedGame[] {
       subplaces: game.subplaces.slice(0, 100).filter(
         place => validPlaceId(place.placeId) &&
           typeof place.name === "string" && place.name.length <= 100
-      )
+      ).map(place => ({
+        placeId: place.placeId,
+        name: place.name,
+        pinned: place.pinned === true
+      }))
     }));
   } catch {
     return [];

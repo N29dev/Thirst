@@ -1,6 +1,7 @@
 export type SavedPlace = {
   placeId: number;
   name: string;
+  pinned?: boolean;
 };
 
 export type SavedGame = {
