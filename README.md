@@ -11,7 +11,8 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 - Dark desktop interface with a low-overhead Lite Mode and subtle cursor-following lighting on cards; effects pause when idle and are disabled with Lite Mode or reduced motion.
 - Save favorite Roblox experiences using place IDs or official game URLs. Thirst retrieves their public names and icons on demand, with manual-name fallback.
 - Sort My Library by saved order, name A–Z, newest or oldest. **Import/export library backups** as JSON; imports merge saved games and pinned subplaces. Local-only, no cookies or Roblox credentials.
-- **Recent launches:** quick rejoin of recently opened Roblox places from Overview, without saving expiring server IDs. History is stored locally and can be cleared.
+- **Recent launches:** quick reopen of Roblox places previously opened through Thirst; these are launch requests, not proof of an actual join.
+- **Game history and rejoin (experimental):** opt-in native parser for local Roblox Player logs (up to 12 recent log tails), with a 30-day / 80-entry on-device history, optional public title/art lookup by button and an exact-server rejoin **only when the server is positively found** in at most three public server pages. Otherwise Thirst opens the game. No raw logs, credentials, or player network addresses enter the Svelte UI. Tracking runs while Overview is visible; not yet validated on a real current Roblox Player build. See [Activity guide](docs/ACTIVITY.md).
 - Save and launch individual subplaces under an experience, or discover publicly listed places on demand (with pagination).
 - Quickly launch saved experiences **and individually pinned subplaces** directly from the Overview grid (up to 24 tiles). Use the star next to a saved subplace to pin/unpin it; the tile's server button goes straight to that subplace's public servers.
 - Fetch public Roblox servers on demand with player counts, Roblox-reported ping, pagination, and instance-specific launch links. Server FPS is deliberately omitted from the browser because it does not predict a player's game FPS.
@@ -57,6 +58,7 @@ Test bundling is enabled. Run `npm run bundle:mac` on macOS (Apple Silicon `.app
 | Roblox Player Fast Flags editor and graphics presets | Implemented; needs real-device Roblox validation |
 | Roblox installer/updater | Not bundled; uses existing official Roblox installation |
 | Recent launches and local library backup/restore | Implemented |
+| Opt-in Roblox Player log history + conservative rejoin | Initial implementation; needs current macOS/Windows Roblox testing |
 | Rich Presence, themes, updates | Consider only when useful |
 | Attributed RoValra regions with flags | Experimental, on by default when manually refreshing servers; remembered opt-out; subject to provider terms |
 | Multi-instance and multi-account support | Research |
