@@ -9,6 +9,11 @@ export function fetchPublicServers(placeId: number, cursor: string | null): Prom
   return invoke<ServerPage>("list_public_servers", { placeId, cursor });
 }
 
+// Public anonymous avatar thumbnails only. No user IDs or raw player tokens reach Svelte.
+export function fetchServerAvatarPreview(placeId: number, serverId: string): Promise<string[]> {
+  return invoke<string[]>("server_avatar_preview", { placeId, serverId });
+}
+
 export function lookupGame(placeId: number): Promise<GameMetadata> {
   return invoke<GameMetadata>("lookup_game", { placeId });
 }
