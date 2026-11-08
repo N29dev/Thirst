@@ -56,13 +56,58 @@ const COUNTRY_ALIASES: Record<string, string> = {
   "UNITED ARAB EMIRATES": "AE", "SAUDI ARABIA": "SA",
   "GERMANY": "DE", "FRANCE": "FR", "NETHERLANDS": "NL",
   "SINGAPORE": "SG", "BRAZIL": "BR", "AUSTRALIA": "AU",
-  "JAPAN": "JP", "INDIA": "IN", "CANADA": "CA", "KAZAKHSTAN": "KZ"
+  "JAPAN": "JP", "INDIA": "IN", "CANADA": "CA", "KAZAKHSTAN": "KZ",
+  "MEXICO": "MX", "ARGENTINA": "AR", "CHILE": "CL", "COLOMBIA": "CO",
+  "PERU": "PE", "URUGUAY": "UY", "PORTUGAL": "PT", "SPAIN": "ES",
+  "ITALY": "IT", "SWEDEN": "SE", "NORWAY": "NO", "FINLAND": "FI",
+  "DENMARK": "DK", "POLAND": "PL", "BELGIUM": "BE", "SWITZERLAND": "CH",
+  "AUSTRIA": "AT", "IRELAND": "IE", "CZECH REPUBLIC": "CZ",
+  "CZECHIA": "CZ", "ROMANIA": "RO", "TURKEY": "TR", "TÜRKIYE": "TR",
+  "CHINA": "CN", "TAIWAN": "TW", "HONG KONG": "HK", "THAILAND": "TH",
+  "VIETNAM": "VN", "PHILIPPINES": "PH", "INDONESIA": "ID",
+  "MALAYSIA": "MY", "PAKISTAN": "PK", "BANGLADESH": "BD",
+  "NEW ZEALAND": "NZ", "EGYPT": "EG", "SOUTH AFRICA": "ZA",
+  "NIGERIA": "NG", "KENYA": "KE"
 };
 
-export function providerBroadRegion(region: ProviderRegion | null | undefined): RegionCode | null {
+// Roblox and RoValra can return ISO codes or a country name. Convert only
+// known country values; never invent a flag for an unrecognized location.
+export function providerCountryCode(region: ProviderRegion | null | undefined): string | null {
   if (!region?.country) return null;
-  const text = region.country.trim().toUpperCase();
-  const country = COUNTRY_ALIASES[text] ?? text;
+  const raw = region.country.trim().toUpperCase();
+  const code = COUNTRY_ALIASES[raw] ?? raw;
+  if (!/^[A-Z]{2}$/.test(code)) return null;
+  return Object.values(COUNTRY_GROUPS).some(codes => codes.includes(code)) ? code : null;
+}
+
+export function providerCountryFlag(region: ProviderRegion | null | undefined): string {
+  const code = providerCountryCode(region);
+  if (!code) return "🌐";
+  // Unicode regional indicator symbols. Uses the OS emoji font, not a
+  // downloaded flag asset or a third-party image service.
+  return String.fromCodePoint(
+    0x1f1e6 + code.charCodeAt(0) - 65,
+    0x1f1e6 + code.charCodeAt(1) - 65
+  );
+}
+
+export function providerCompactRegionLabel(region: ProviderRegion | null | undefined): string {
+  if (!region) return "Unknown";
+  // City + country is much easier to scan than city + state + country in a
+  // narrow server list; the complete location stays available on hover.
+  const city = region.city?.trim();
+  const area = region.region?.trim();
+  const country = region.country?.trim();
+  const main = city || area || country;
+  if (!main) return "Unknown";
+  return country && main.toLowerCase() !== country.toLowerCase()
+    ? main + ", " + country
+    : main;
+}
+
+export function providerBroadRegion(region: ProviderRegion | null | undefined): RegionCode | null {
+  const country = providerCountryCode(region);
+  if (!country) return null;
   for (const option of REGION_OPTIONS) {
     if (COUNTRY_GROUPS[option.code].includes(country)) return option.code;
   }
