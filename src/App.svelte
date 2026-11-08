@@ -70,6 +70,13 @@
   let toastTimeout: ReturnType<typeof setTimeout> | undefined;
   let loading = false;
   let servers: PublicServer[] = [];
+  // Only counts the fetched pages; never describe these as the whole place's
+  // live population or available Roblox servers.
+  $: loadedOpenSlots = servers.reduce((total, server) =>
+    total + Math.max(0, server.maxPlayers - server.playing), 0);
+  $: loadedFullServers = servers.filter(server => server.playing >= server.maxPlayers).length;
+  $: activePlaceLabel = availablePlaces.find(place => place.placeId === activePlaceId)?.name
+    ?? (activePlaceId ? "Selected place" : "Choose a place");
   let serverSort: ServerSort = "default";
   let serverHideFull = false;
   let serverMaxPing = "any";
@@ -1292,7 +1299,25 @@
           </div>
         </div>
       {:else if tab === "servers"}
-        <div class="page-title"><div><span class="eyebrow">LIVE DISCOVERY</span><h1>Public servers</h1><p>Public Roblox server data, requested only when you refresh.</p></div><span class="chip">{useAuthenticatedAvatarRequests && connectedAccount ? "SESSION-BACKED REQUESTS" : "PUBLIC REQUESTS"}</span></div>
+        <div class="page-title"><div><span class="eyebrow">LIVE DISCOVERY</span><h1>Public servers</h1><p>Find a place to play. All counts refer only to the server pages you've loaded.</p></div><span class="chip">{useAuthenticatedAvatarRequests && connectedAccount ? "SESSION-BACKED REQUESTS" : "PUBLIC REQUESTS"}</span></div>
+        {#key activePlaceId}
+          <div class="server-context" in:fly={{ y: liteMode || reducedMotion ? 0 : 10, opacity: .85, duration: liteMode || reducedMotion ? 0 : 200, easing: cubicOut }}>
+            <span class="server-context-art">
+              <GameArtwork name={selected?.name ?? "Roblox"} src={selected?.iconUrl} variant="tile"/>
+            </span>
+            <div class="server-context-body">
+              <span class="eyebrow">SELECTED DESTINATION</span>
+              <strong>{selected?.name ?? "Choose an experience"}</strong>
+              <span class="server-context-place">{activePlaceLabel}{activePlaceId ? " · Place " + activePlaceId : ""}</span>
+            </div>
+            <div class="server-context-stats" aria-label="Counts for loaded public server pages">
+              <div><strong>{servers.length}</strong><span>Loaded servers</span></div>
+              <div><strong>{loadedOpenSlots}</strong><span>Open slots in loaded pages</span></div>
+              <div><strong>{loadedFullServers}</strong><span>Full in loaded pages</span></div>
+            </div>
+            <button class="btn secondary small server-context-library" onclick={() => tab = "library"}>Library <UiIcon name="arrow-up-right" size={14}/></button>
+          </div>
+        {/key}
         <div class="panel server-panel">
           <div class="server-toolbar">
             <label for="server-game">Experience</label>
@@ -1354,7 +1379,12 @@
             
           </div>
           <div class="server-result-note">
-            <span>{visibleServers.length} shown / {servers.length} loaded · {servers.filter(server => !!regionReportFor(server.id)).length} local reports · {Object.keys(providerRegions).length} RoValra results / {rovalraCheckedIds.size} checked · {servers.filter(server => !providerRegions[server.id.toLowerCase()]).length} awaiting region</span>
+            <div class="server-result-summary" aria-live="polite">
+              <span class="server-result-count"><strong>{visibleServers.length}</strong> shown from {servers.length} loaded</span>
+              <span class="server-result-source">{servers.filter(server => !!regionReportFor(server.id)).length} local reports</span>
+              <span class="server-result-source">{Object.keys(providerRegions).length} provider regions / {rovalraCheckedIds.size} checked</span>
+              {#if loading}<span class="server-loading-chip">Updating list…</span>{/if}
+            </div>
             <button class="link-button" onclick={() => { serverSort = "default"; serverMaxPing = "any"; serverHideFull = false; serverSearch = ""; regionFilter = "any"; }}>Clear filters</button>
             {#if serverLoadError}<span class="server-error">Last request failed: {serverLoadError}</span>{/if}
             {#if rovalraError}<span class="server-error">RoValra: {rovalraError}</span>{/if}
@@ -1375,9 +1405,21 @@
               <span class="sr-only">Loading public servers from Roblox…</span>
             </div>
           {/if}
-          {#each visibleServers as server (server.id)}
-            <div class="server-row">
-              <span class="server-id"><span class="online-dot"></span><button class="server-id-copy" title={"Copy server ID: " + server.id} aria-label={"Copy server ID " + server.id} onclick={() => copyServerId(server.id)}>{server.id.slice(0, 8)}… <span aria-hidden="true">⧉</span></button></span>
+          {#each visibleServers as server, index (server.id)}
+            <div class="server-row" class:server-full={server.playing >= server.maxPlayers}>
+              <div class="server-identity">
+                <span class="server-id"><span class="server-index">{String(index + 1).padStart(2, "0")}</span><button class="server-id-copy" title={"Copy full server ID: " + server.id} aria-label={"Copy server ID " + server.id} onclick={() => copyServerId(server.id)}>{server.id.slice(0, 8)}… <span aria-hidden="true">⧉</span></button></span>
+                {#if avatarPreviews[server.id]?.length}
+                  <div class="server-inline-avatars" title="Anonymous Roblox player avatar previews; may not reflect current players">
+                    {#each avatarPreviews[server.id].slice(0, 4) as avatar (avatar)}
+                      <img src={avatar} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon}/>
+                    {/each}
+                    <span aria-label="Anonymous avatar previews">Preview</span>
+                  </div>
+                {:else}
+                  <span class="server-identity-subtitle">Public instance</span>
+                {/if}
+              </div>
               <button
                 class="server-region-button"
                 class:reported={!!regionReportFor(server.id)}
@@ -1394,11 +1436,14 @@
                 {/if}
                 <span class="region-name">{displayServerRegion(server.id)}</span>
               </button>
-              <span><strong>{server.playing}</strong><span class="muted"> / {server.maxPlayers}</span></span>
-              <span>{server.ping === null ? "—" : Math.round(server.ping) + " ms"}</span>
+              <div class="server-population" title={server.playing + " of " + server.maxPlayers + " places occupied"}>
+                <div class="server-population-label"><strong>{server.playing}<span class="muted"> / {server.maxPlayers}</span></strong><small>{server.playing >= server.maxPlayers ? "Full" : Math.max(0, server.maxPlayers - server.playing) + " slots free"}</small></div>
+                <div class="server-capacity-track"><span class:capacity-full={server.playing >= server.maxPlayers} style:width={Math.min(100, Math.max(0, server.maxPlayers > 0 ? server.playing / server.maxPlayers * 100 : 0)) + "%"}></span></div>
+              </div>
+              <span class="server-ping">{server.ping === null ? "Not reported" : Math.round(server.ping) + " ms"}<small>Server reported</small></span>
               <div class="server-actions">
-                <button class:active={expandedPreviewId === server.id} class="server-preview-button" aria-expanded={expandedPreviewId === server.id} disabled={previewLoadingId !== null && previewLoadingId !== server.id} title="Show up to five anonymous player avatars" onclick={() => toggleServerPreview(server.id)}>Avatars</button>
-                <button class="btn small secondary" onclick={() => activePlaceId && play(activePlaceId, server.id)}>Join ↗</button>
+                <button class:active={expandedPreviewId === server.id} class="server-preview-button" aria-expanded={expandedPreviewId === server.id} disabled={previewLoadingId !== null && previewLoadingId !== server.id} title="Show up to five anonymous player avatars" onclick={() => toggleServerPreview(server.id)}><UiIcon name="library" size={14}/>{expandedPreviewId === server.id ? "Hide players" : "Avatars"}</button>
+                <button class="btn small primary" disabled={server.playing >= server.maxPlayers} title={server.playing >= server.maxPlayers ? "Server is full in the last public sample" : "Launch this public instance"} onclick={() => activePlaceId && play(activePlaceId, server.id)}> {server.playing >= server.maxPlayers ? "Full" : "Join"} <UiIcon name="arrow-up-right" size={14}/></button>
               </div>
             </div>
             {#if editingRegionId === server.id}
@@ -1427,9 +1472,12 @@
             {/if}
             {#if expandedPreviewId === server.id || (autoAvatarEnabled && connectedAccount && !liteMode && ((avatarPreviews[server.id]?.length ?? 0) > 0 || (bulkPreviewBusy && bulkPreviewRequested.includes(server.id))))}
               <div class="server-avatar-panel" class:auto-loaded={expandedPreviewId !== server.id}>
-                <span class="preview-caption">Anonymous public avatar previews · no player names or IDs</span>
+                <span class="preview-caption">Anonymous avatar previews from Roblox · images may lag behind live players</span>
                 {#if previewLoadingId === server.id || (bulkPreviewBusy && bulkPreviewRequested.includes(server.id))}
-                  <span class="preview-status">Requesting up to five anonymous thumbnails from Roblox…</span>
+                  <div class="avatar-loading-strip" role="status" aria-label="Loading anonymous avatar previews">
+                    {#each [0,1,2,3,4] as n (n)}<span class="avatar-placeholder"></span>{/each}
+                    <span class="preview-status">Requesting up to five thumbnails…</span>
+                  </div>
                 {:else if avatarErrors[server.id]}
                   <span class="preview-status preview-error">{avatarErrors[server.id]}</span>
                   <button class="btn small secondary" onclick={() => { avatarErrors = { ...avatarErrors, [server.id]: "" }; expandedPreviewId = null; void toggleServerPreview(server.id); }}>Retry</button>
