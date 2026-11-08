@@ -3,6 +3,7 @@
   import { fly } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
   import UiIcon from "./UiIcon.svelte";
+  import GameArtwork from "./GameArtwork.svelte";
   import thirstAppIcon from "../src-tauri/icons/thirst.svg";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
@@ -1109,18 +1110,24 @@
           <div class="stat hover-glow"><small>BACKGROUND REFRESH</small><strong>OFF</strong><span>Servers load only on request</span></div>
         </div>
         {#if quickLaunchItems.length}
-          <div class="section-heading"><div><span class="eyebrow">ONE-CLICK LAUNCH</span><h2>Your favorites</h2></div><button class="link-button" onclick={() => tab = "library"}>Manage library ↗</button></div>
+          <div class="section-heading favorites-heading"><div><span class="eyebrow">READY TO PLAY</span><h2>Your favorites</h2><p class="section-subcopy">Launch a game or jump straight to its public servers.</p></div><button class="link-button" onclick={() => tab = "library"}>Manage library ↗</button></div>
           <div class="quick-launch-grid">
             {#each quickLaunchItems as item (`${item.parentPlaceId}:${item.placeId}`)}
-              <div class="quick-game hover-glow" class:subplace={item.isSubplace}>
+              <div class="quick-game" class:subplace={item.isSubplace}>
                 <button class="quick-game-main" onclick={() => play(item.placeId)} title={"Launch " + item.name} aria-label={"Launch " + item.name}>
-                  <span class="game-tile quick-game-icon">{item.name.slice(0, 1).toUpperCase()}
-                    {#if isTrustedIconUrl(item.iconUrl)}<img src={item.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
+                  <span class="quick-game-media">
+                    <GameArtwork name={item.name} src={item.iconUrl} variant="cover"/>
+                    <span class="quick-game-kind">{item.isSubplace ? "SUBPLACE" : "EXPERIENCE"}</span>
+                    <span class="quick-game-launch-cue"><UiIcon name="play" size={16}/></span>
                   </span>
-                  <span class="quick-game-title">{item.name}</span>
-                  {#if item.isSubplace}<span class="quick-game-label" title={item.parentName}>SUBPLACE · {item.parentName}</span>{/if}
+                  <span class="quick-game-info">
+                    <strong class="quick-game-title">{item.name}</strong>
+                    <small class="quick-game-label" title={item.parentName}>
+                      {item.isSubplace ? item.parentName : "Roblox experience"}
+                    </small>
+                  </span>
                 </button>
-                <button class="quick-game-server" title={"Browse " + item.name + " servers"} aria-label={"Browse " + item.name + " servers"} onclick={() => { selectGame(item.parentPlaceId); goToServers(item.placeId); }}><UiIcon name="server" size={15}/></button>
+                <button class="quick-game-server" title={"Browse " + item.name + " servers"} aria-label={"Browse " + item.name + " servers"} onclick={() => { selectGame(item.parentPlaceId); goToServers(item.placeId); }}><UiIcon name="server" size={17}/></button>
               </div>
             {/each}
           </div>
@@ -1162,7 +1169,7 @@
         </div>
         <div class="library-layout">
           <div class="panel">
-            <div class="panel-header"><h3>Saved experiences</h3></div>
+            <div class="panel-header library-list-head"><div><span class="eyebrow">COLLECTION</span><h3>Saved experiences</h3></div><span class="library-total">{games.length} total</span></div>
             <input class="input search" aria-label="Filter saved games" placeholder="⌕  Find a game…" bind:value={filter} />
             <div class="library-sort-controls">
               <label for="library-sort">Sort library</label>
@@ -1175,15 +1182,19 @@
             </div>
             <div class="games-list">
               {#each filteredGames as game (game.placeId)}
-                <button class:selected={selectedId === game.placeId} class="game-row" onclick={() => selectGame(game.placeId)}>
-                  <span class="game-tile">{game.name.slice(0, 1).toUpperCase()}
-                    {#if isTrustedIconUrl(game.iconUrl)}<img src={game.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
-                  </span>
-                  <span class="game-row-name"><strong>{game.name}</strong><small>{game.subplaces.length} subplaces</small></span>
+                <button class:selected={selectedId === game.placeId} aria-pressed={selectedId === game.placeId} class="game-row" onclick={() => selectGame(game.placeId)}>
+                  <span class="library-row-art"><GameArtwork name={game.name} src={game.iconUrl} variant="tile" /></span>
+                  <span class="game-row-name"><strong>{game.name}</strong><small>{game.subplaces.length ? game.subplaces.length + " saved subplaces" : "Main place only"}{game.subplaces.some(place => place.pinned) ? " · " + game.subplaces.filter(place => place.pinned).length + " pinned" : ""}</small></span>
                   <span class="game-chevron">›</span>
                 </button>
               {:else}
-                <p class="empty-list">No saved games found.</p>
+                <div class="empty-list">
+                  <strong>{games.length ? "No matching experiences" : "No saved games yet"}</strong>
+                  <span>{games.length ? "Try searching by a different name or place ID." : "Add your first Roblox experience below."}</span>
+                  {#if games.length && filter}
+                    <button class="link-button" onclick={() => filter = ""}>Clear search</button>
+                  {/if}
+                </div>
               {/each}
             </div>
             <form class="add-form" onsubmit={event => { event.preventDefault(); addGame(); }}>
@@ -1198,15 +1209,21 @@
           </div>
           <div class="panel detail-panel">
             {#if selected}
-              <div class="game-detail-head">
-                <span class="game-tile large">{selected.name.slice(0, 1).toUpperCase()}
-                  {#if isTrustedIconUrl(selected.iconUrl)}<img src={selected.iconUrl} alt="" loading="lazy" decoding="async" onerror={hideBrokenIcon} />{/if}
-                </span>
-                <div class="detail-title"><span class="eyebrow">SAVED EXPERIENCE</span><h2>{selected.name}</h2><p>Place ID {selected.placeId}</p></div>
+              <div class="game-spotlight">
+                <div class="spotlight-art"><GameArtwork name={selected.name} src={selected.iconUrl} variant="hero" eager /></div>
+                <div class="spotlight-info">
+                  <span class="eyebrow">SAVED EXPERIENCE</span>
+                  <h2 title={selected.name}>{selected.name}</h2>
+                  <p>Place ID {selected.placeId}</p>
+                  <div class="spotlight-tags">
+                    <span>{selected.subplaces.length} {selected.subplaces.length === 1 ? "subplace" : "subplaces"}</span>
+                    <span>{selected.subplaces.filter(place => place.pinned).length} pinned to Quickplay</span>
+                  </div>
+                </div>
               </div>
               <div class="detail-actions">
-                <button class="btn primary" onclick={() => play(selected.placeId)}>▶ Play experience</button>
-                <button class="btn secondary" onclick={() => goToServers(selected.placeId)}>◎ Servers</button>
+                <button class="btn primary" onclick={() => play(selected.placeId)}><UiIcon name="play" size={16}/> Play experience</button>
+                <button class="btn secondary" onclick={() => goToServers(selected.placeId)}><UiIcon name="server" size={16}/> Browse servers</button>
                 <button class="btn secondary" disabled={syncingGame} onclick={syncSelectedGame}>{syncingGame ? "Syncing…" : "↻ Update icon"}</button>
                 {#if games.length > 1}
                   <button class="btn secondary" title="Move experience up in favorites" aria-label={"Move " + selected.name + " up"} disabled={games[0]?.placeId === selected.placeId} onclick={() => moveGame(-1)}>↑ Move</button>
