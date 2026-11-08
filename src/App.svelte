@@ -3,7 +3,7 @@
   import {
     beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
     disconnectRobloxAccount, discoverSubplaces, fetchPublicServers,
-    finishRobloxLogin, launchPlace, lookupGame, openRobloxLogin, platformName
+    finishRobloxLogin, launchPlace, lookupGame, openRobloxLogin, platformName, pollRobloxLoginStatus
   } from "./lib/backend";
   import type { ConnectedAccount } from "./lib/backend";
   import { isTrustedIconUrl, parsePlaceId, readLibrary, readLiteMode, writeLibrary, writeLiteMode } from "./lib/library";
@@ -43,6 +43,8 @@
   let readWarning = false;
   let secondsLeft = 15;
   let consentTimer: ReturnType<typeof setInterval> | undefined;
+  let nativeLoginTimer: ReturnType<typeof setInterval> | undefined;
+  let nativeLoginCheckInProgress = false;
 
   $: selected = games.find(game => game.placeId === selectedId) || null;
   $: filteredGames = games.filter(game => game.name.toLowerCase().includes(filter.toLowerCase()) ||
@@ -68,6 +70,7 @@
     return () => {
       if (toastTimeout) clearTimeout(toastTimeout);
       if (consentTimer) clearInterval(consentTimer);
+      if (nativeLoginTimer) clearInterval(nativeLoginTimer);
     };
   });
 
@@ -88,6 +91,33 @@
   function stopConsentTimer() {
     if (consentTimer) clearInterval(consentTimer);
     consentTimer = undefined;
+  }
+
+  function stopNativeLoginPolling() {
+    if (nativeLoginTimer) clearInterval(nativeLoginTimer);
+    nativeLoginTimer = undefined;
+  }
+
+  async function checkNativeLogin() {
+    if (nativeLoginCheckInProgress || loginBusy || loginStep !== "browser") return;
+    nativeLoginCheckInProgress = true;
+    try {
+      const status = await pollRobloxLoginStatus();
+      if (status === "ready") {
+        stopNativeLoginPolling();
+        await completeLogin();
+      } else if (status === "cancelled") {
+        stopNativeLoginPolling();
+        loginStep = null;
+        await cancelRobloxLogin();
+        notice("Roblox sign-in was cancelled.");
+      }
+    } catch {
+      // Transient Keychain or process status failures should not close login.
+      // The user can still click Finish connection manually.
+    } finally {
+      nativeLoginCheckInProgress = false;
+    }
   }
 
   async function beginLogin() {
@@ -119,6 +149,10 @@
       await openRobloxLogin(true);
       stopConsentTimer();
       loginStep = "browser";
+      if (platform === "macOS") {
+        stopNativeLoginPolling();
+        nativeLoginTimer = setInterval(() => { void checkNativeLogin(); }, 1500);
+      }
     } catch (error) {
       notice("Roblox sign-in window failed: " + String(error), "bad");
     } finally {
@@ -133,6 +167,7 @@
       connectedAccount = await finishRobloxLogin();
       accountError = "";
       loginStep = null;
+      stopNativeLoginPolling();
       notice("Connected to Roblox as @" + connectedAccount.name);
     } catch (error) {
       notice("Sign-in was not completed: " + String(error), "bad");
@@ -143,6 +178,7 @@
 
   async function cancelLogin() {
     stopConsentTimer();
+    stopNativeLoginPolling();
     loginStep = null;
     try {
       await cancelRobloxLogin();
