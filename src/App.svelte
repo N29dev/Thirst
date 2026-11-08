@@ -45,6 +45,7 @@
   let serverFavoritesOnly = false;
   let serverSearch = "";
   let serverLoadError = "";
+  let nextServerRequestAt = 0;
   let expandedPreviewId: string | null = null;
   let previewLoadingId: string | null = null;
   let avatarPreviews: Record<string, string[]> = {};
@@ -504,7 +505,15 @@
 
   async function loadServers(loadMore = false) {
     if (!activePlaceId || loading || (loadMore && !nextCursor)) return;
+    // Respect Roblox's public endpoint limits without background timers.
+    // This only throttles requests from this app, not all devices on the IP.
+    const waitSeconds = Math.ceil((nextServerRequestAt - Date.now()) / 1000);
+    if (waitSeconds > 0) {
+      notice("Server requests are cooling down. Try again in " + waitSeconds + "s.");
+      return;
+    }
     const requestedPlace = activePlaceId;
+    nextServerRequestAt = Date.now() + 8000;
     loading = true;
     serverLoadError = "";
     try {
@@ -522,6 +531,9 @@
     } catch (error) {
       if (activePlaceId === requestedPlace) {
         serverLoadError = String(error);
+        if (/rate.limit|429/i.test(serverLoadError)) {
+          nextServerRequestAt = Date.now() + 45000;
+        }
         notice("Could not fetch servers: " + serverLoadError, "bad");
       }
     } finally {
@@ -809,6 +821,7 @@
           </div>
           <div class="server-result-note">
             <span>{visibleServers.length} shown / {servers.length} loaded · Region: <strong>Unknown</strong></span>
+            <button class="link-button" onclick={() => { serverSort = "default"; serverMaxPing = "any"; serverHideFull = false; serverFavoritesOnly = false; serverSearch = ""; }}>Clear filters</button>
             {#if serverLoadError}<span class="server-error">Last request failed: {serverLoadError}</span>{/if}
           </div>
           <div class="table-head"><span>SERVER</span><span>PLAYERS</span><span>REPORTED PING</span><span>ACTIONS</span></div>
