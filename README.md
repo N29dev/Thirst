@@ -15,7 +15,7 @@ Built independently with **Tauri 2 + Rust + Svelte + TypeScript**. Inspired by i
 - Fetch public Roblox servers on demand with player counts, Roblox-reported ping and FPS, pagination, and instance-specific launch links.
 - Launch Roblox using its registered desktop deep-link protocol on macOS or Windows.
 - Keep bookmarks and preferences locally. No Thirst account, telemetry, or background polling.
-- Optional **AppleBlox-style** Roblox session login: a 15-second Rust consent gate; on macOS, a separate **Swift/WKWebView helper** with non-persistent storage, automatic native cookie detection and a temporary Keychain entry; on Windows, an isolated Tauri webview. Native code verifies the cookie with Roblox before storing the primary credential. No cookie is returned to Svelte.
+- Optional **AppleBlox-style** Roblox session login: a 15-second Rust consent gate; on macOS, a separate **Swift/WKWebView helper** with non-persistent storage, automatic native cookie detection and a temporary Keychain entry; on Windows, an isolated Tauri webview. Native code verifies the cookie with Roblox before storing the primary credential. On macOS the app automatically finishes once the helper closes successfully; manual Finish remains available as a fallback. No cookie is returned to Svelte.
 
 ## Run locally
 
