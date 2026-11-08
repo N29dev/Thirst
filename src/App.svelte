@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
+  import ActivityPanel from "./ActivityPanel.svelte";
   import {readRecentLaunches, recordRecentLaunch, clearRecentLaunches, recentPlaceName} from "./lib/recent";
   import type {RecentLaunch} from "./lib/recent";
   import {exportLibraryJson, importLibraryJson, mergeImportedLibrary} from "./lib/library-backup";
@@ -783,7 +784,7 @@
     }
   }
 
-  async function play(placeId: number, jobId: string | null = null) {
+  async function play(placeId: number, jobId: string | null = null): Promise<boolean> {
     try {
       await launchPlace(placeId, jobId);
       try {
@@ -792,8 +793,10 @@
         // History never prevents starting Roblox.
       }
       notice(jobId ? "Opening selected server in Roblox…" : "Opening Roblox…");
+      return true;
     } catch (error) {
       notice(String(error), "bad");
+      return false;
     }
   }
 
@@ -1042,9 +1045,10 @@
             <p class="form-hint">Showing the first 24 shortcuts. Your other saved places remain available in My Library.</p>
           {/if}
         {/if}
+        <ActivityPanel games={games} onLaunch={play}/>
         {#if recentLaunches.length}
           <div class="section-heading recent-heading">
-            <div><span class="eyebrow">RECENTLY OPENED</span><h2>Quick rejoin</h2></div>
+            <div><span class="eyebrow">THIRST LAUNCH SHORTCUTS</span><h2>Recently opened</h2></div>
             <button class="link-button" onclick={clearRecent}>Clear history</button>
           </div>
           <div class="recent-launch-list">
