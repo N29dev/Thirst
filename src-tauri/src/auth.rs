@@ -141,6 +141,33 @@ fn read_session() -> Result<Option<String>, String> {
     }
 }
 
+/// An explicitly enabled avatar-preview experiment can read the saved cookie
+/// inside native Rust, never in JavaScript. The caller must use a fixed Roblox
+/// HTTPS host with disabled redirects; this function does not send requests.
+pub(crate) fn thumbnail_session() -> Result<String, String> {
+    let token = read_session()?
+        .ok_or("Connect your Roblox account before enabling authenticated avatar requests.")?;
+    if token.is_empty() || token.len() > 8192 ||
+        token.contains('\r') || token.contains('\n') || token.contains(';') {
+        return Err("The saved Roblox session is invalid; reconnect using the official login.".into());
+    }
+    Ok(token)
+}
+
+/// Only pass response headers from the fixed thumbnails.roblox.com host with
+/// redirects disabled. Never include the cookie or response body in errors.
+pub(crate) fn rotate_thumbnail_session(
+    original: &str,
+    headers: &reqwest::header::HeaderMap,
+) -> Result<(), String> {
+    if let Some(next) = rotated_cookie(headers) {
+        if next != original {
+            save_session(&next)?;
+        }
+    }
+    Ok(())
+}
+
 fn delete_session() -> Result<(), String> {
     match keyring_entry()?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
@@ -164,8 +191,9 @@ fn rotated_cookie(headers: &reqwest::header::HeaderMap) -> Option<String> {
 }
 
 async fn verify_cookie(token: &str) -> Result<(ConnectedAccount, Option<String>), String> {
-    // This is the ONLY host to which this module sends the cookie.
-    // Never share it with game metadata, analytics, RoValra, Cloudflare or plugins.
+    // Default account verification sends the cookie only to this fixed host.
+    // The separately enabled avatar-preview experiment may additionally send
+    // it to thumbnails.roblox.com. Never send it to RoValra, CDNs or plugins.
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(10))
         .redirect(reqwest::redirect::Policy::none())
