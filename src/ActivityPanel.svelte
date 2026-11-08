@@ -24,13 +24,18 @@
   onMount(() => {
     tracking = historyEnabled();
     entries = readActivityHistory();
+    const onLaunchHistory = () => { entries = readActivityHistory(); };
+    window.addEventListener("thirst:activity-updated", onLaunchHistory);
     if (tracking) void refresh(false);
     // Local log scan only, only while Home is mounted and visible.
     // No Roblox requests, user tokens, external telemetry or persistent worker.
     const timer = setInterval(() => {
       if (tracking && document.visibilityState === "visible") void refresh(false);
     }, 30_000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("thirst:activity-updated", onLaunchHistory);
+    };
   });
 
   async function refresh(manual = true) {
