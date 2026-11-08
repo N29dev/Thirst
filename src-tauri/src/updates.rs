@@ -10,6 +10,7 @@ use std::time::Duration;
 
 const RELEASES_API: &str = "https://api.github.com/repos/N29dev/Thirst/releases/latest";
 const RELEASES_PAGE: &str = "https://github.com/N29dev/Thirst/releases/latest";
+const DEV_BUILDS_PAGE: &str = "https://github.com/N29dev/Thirst/actions/workflows/package.yml";
 const MAX_RESPONSE: usize = 96 * 1024;
 
 #[derive(Debug, Serialize)]
@@ -110,6 +111,14 @@ pub fn open_thirst_releases(app: tauri::AppHandle) -> Result<(), String> {
     app.opener()
         .open_url(RELEASES_PAGE.to_string(), None::<&str>)
         .map_err(|_| "Could not open Thirst's GitHub releases page.".to_owned())
+}
+
+#[tauri::command]
+pub fn open_thirst_dev_builds(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(DEV_BUILDS_PAGE.to_string(), None::<&str>)
+        .map_err(|_| "Could not open Thirst's development builds page.".to_owned())
 }
 
 #[cfg(test)]
