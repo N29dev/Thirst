@@ -424,3 +424,28 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @media(prefers-reduced-motion:reduce){
   .quick-game:hover,.feature:hover,.btn:hover:not(:disabled){transform:none}
 }
+
+
+/* Self-update discovery: release checks are explicit/once-per-launch and
+   never trigger an unsigned installation. */
+.update-panel{align-items:flex-start;gap:20px}
+.update-panel-info{min-width:0;flex:1}
+.update-panel-info h3{font-size:15px;letter-spacing:-.2px}
+.update-panel-info p{max-width:800px;line-height:1.7}
+.update-status{
+  display:inline-block;margin-top:12px;padding:8px 11px;
+  border:1px solid #3e6575;background:#123444;color:#aedfe8;
+  font-size:11px;font-weight:750;border-radius:9px;max-width:100%;
+}
+.update-buttons{display:flex;gap:9px;flex-wrap:wrap;margin-top:13px}
+.update-buttons .btn{min-height:36px}
+.update-panel-info .update-notes{
+  white-space:pre-wrap;max-height:130px;overflow:auto;overflow-wrap:anywhere;
+  padding:12px 14px;margin-top:12px;background:#0e1a28;
+  border:1px solid #354d61;border-radius:11px;color:#a8c6d5;font-size:11px
+}
+.update-panel-info .update-disclaimer{font-size:10px;color:#8ba8ba;margin-top:12px}
+@media(max-width:650px){
+  .update-panel{flex-direction:column-reverse;align-items:stretch}
+  .update-panel>.switch{align-self:flex-end}
+}
