@@ -214,10 +214,10 @@ fn roblox_running() -> Option<bool> {
 
 fn inspect(app: &tauri::AppHandle) -> RobloxInstallStatus {
     let manual = saved_override(app);
-    let mut candidates = Vec::new();
-    if let Some(path) = manual.as_ref() { candidates.push(("custom", path.clone())); }
-    candidates.extend(candidates().into_iter().map(|path| ("automatic", path)));
-    let found = candidates.into_iter().find_map(|(source, candidate)| {
+    let mut locations = Vec::new();
+    if let Some(path) = manual.as_ref() { locations.push(("custom", path.clone())); }
+    locations.extend(candidates().into_iter().map(|path| ("automatic", path)));
+    let found = locations.into_iter().find_map(|(source, candidate)| {
         if valid_candidate(&candidate) { Some((source, candidate)) } else { None }
     });
     let protocol = protocol_registration();
