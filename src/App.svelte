@@ -9,6 +9,7 @@
   import thirstAppIcon from "../src-tauri/icons/thirst.svg";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
+  import RobloxInstallPanel from "./RobloxInstallPanel.svelte";
   import {
     historyEnabled, mergeObservedSessions, readActivityHistory,
     recordLaunchAttempt, trackingEpoch, trackingSince
@@ -910,10 +911,13 @@
       } catch {
         // History never prevents starting Roblox.
       }
-      notice(jobId ? "Opening selected server in Roblox…" : "Opening Roblox…");
+      notice(jobId
+        ? "Server launch request sent to Roblox. A successful join is not yet confirmed."
+        : "Game launch request sent to Roblox. Check Game History for connection status.");
       return true;
     } catch (error) {
-      notice(String(error), "bad");
+      notice("Roblox launch failed: " + String(error) +
+        " Open Settings → Roblox & Launch to check the installation.", "bad");
       return false;
     }
   }
@@ -1555,6 +1559,7 @@
       {:else}
         <div class="page-title"><div><span class="eyebrow">PREFERENCES & PRIVACY</span><h1>Settings</h1><p>Personalize Thirst without compromising performance.</p></div></div>
         <div class="settings-column">
+          <RobloxInstallPanel />
           <section class="panel settings-panel update-panel">
             <div class="update-panel-info">
               <h3>Thirst updates</h3>
