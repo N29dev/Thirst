@@ -7,6 +7,7 @@ mod updates;
 mod server_previews;
 mod rovalra;
 mod fastflags;
+mod roblox_install;
 
 use std::time::Duration;
 use tauri_plugin_opener::OpenerExt;
@@ -333,6 +334,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             launch_place,
+            roblox_install::roblox_install_status,
+            roblox_install::set_roblox_install_path,
+            roblox_install::open_roblox_install_folder,
+            roblox_install::open_roblox_download_page,
+            roblox_install::roblox_running_status,
             activity::recent_player_sessions,
             updates::check_thirst_update,
             updates::open_thirst_releases,
