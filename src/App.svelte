@@ -223,7 +223,7 @@
         const epoch = trackingEpoch();
         const since = trackingSince();
         const observed = await recentPlayerSessions(since);
-        if (historyEnabled() && trackingEpoch() === epoch) {
+        if (tab !== "home" && historyEnabled() && trackingEpoch() === epoch) {
           mergeObservedSessions(readActivityHistory(), observed, games, since);
         }
       } catch {
