@@ -6,6 +6,7 @@ export type PlayerSession = {
   placeId: number;
   serverId: string;
   joinedAt: number;
+  connectedAt: number | null;
   endedAt: number | null;
 };
 
@@ -15,6 +16,8 @@ export type ActivityEntry = {
   iconUrl?: string;
   serverId: string | null;
   joinedAt: number;
+  // Optional for activity entries persisted before connection tracking.
+  connectedAt?: number | null;
   endedAt: number | null;
   source: "player-log" | "launch-request";
 };
@@ -51,15 +54,20 @@ export function historyEnabled(): boolean {
   catch { return false; }
 }
 
-export function trackingSince(): number {
+// This opt-in timestamp remains stable even after seven days. The rolling
+// history scan limit is NOT suitable for invalidating an in-flight scan.
+export function trackingEpoch(): number {
   const now = Date.now();
   try {
-    const parsed = Number(localStorage.getItem(SINCE));
-    if (Number.isSafeInteger(parsed) && parsed > 0 && parsed <= now) {
-      return Math.max(parsed, now - SEVEN_DAYS + 60_000);
-    }
+    const stored = localStorage.getItem(SINCE);
+    const parsed = stored === null ? NaN : Number(stored);
+    if (Number.isSafeInteger(parsed) && parsed > 0 && parsed <= now) return parsed;
   } catch { /* no persisted setting */ }
   return now;
+}
+
+export function trackingSince(): number {
+  return Math.max(trackingEpoch(), Date.now() - SEVEN_DAYS + 60_000);
 }
 
 export function setHistoryEnabled(enabled: boolean): void {
@@ -82,7 +90,11 @@ export function readActivityHistory(): ActivityEntry[] {
         (e.iconUrl === undefined || isTrustedIconUrl(e.iconUrl)) &&
         (e.serverId === null || isValidServerId(e.serverId)) &&
         cleanTime(e.joinedAt, now) &&
+        (e.connectedAt === undefined || e.connectedAt === null ||
+          (cleanTime(e.connectedAt, now) && e.connectedAt >= e.joinedAt)) &&
         (e.endedAt === null || (cleanTime(e.endedAt, now) && e.endedAt >= e.joinedAt)) &&
+        (e.connectedAt === undefined || e.connectedAt === null || e.endedAt === null ||
+          e.connectedAt <= e.endedAt) &&
         (e.source === "player-log" || e.source === "launch-request");
     }).sort((a, b) => b.joinedAt - a.joinedAt)
       .slice(0, MAX_ENTRIES);
@@ -105,7 +117,7 @@ export function recordLaunchAttempt(
     placeId, name: knownName(games, placeId),
     iconUrl: activityIcon(games, placeId) ?? undefined,
     serverId,
-    joinedAt: at, endedAt: null, source: "launch-request"
+    joinedAt: at, connectedAt: null, endedAt: null, source: "launch-request"
   };
   return persist([attempt, ...entries]);
 }
@@ -118,14 +130,21 @@ export function mergeObservedSessions(
   for (const obs of observations) {
     if (!validPlaceId(obs.placeId) || !isValidServerId(obs.serverId) ||
       !cleanTime(obs.joinedAt, now) || obs.joinedAt < since ||
+      (obs.connectedAt !== null && (!cleanTime(obs.connectedAt, now) ||
+        obs.connectedAt < obs.joinedAt)) ||
       (obs.endedAt !== null && (!cleanTime(obs.endedAt, now) ||
-        obs.endedAt < obs.joinedAt))) continue;
+        obs.endedAt < obs.joinedAt)) ||
+      (obs.connectedAt !== null && obs.endedAt !== null &&
+        obs.connectedAt > obs.endedAt)) continue;
 
     const existing = result.find(e => e.source === "player-log" &&
       e.placeId === obs.placeId && e.serverId === obs.serverId &&
       e.joinedAt === obs.joinedAt);
     if (existing) {
-      existing.endedAt = obs.endedAt;
+      // A newer truncated log tail can omit an old event, but it should
+      // not erase a connection or disconnect we previously observed.
+      if (obs.connectedAt !== null) existing.connectedAt = obs.connectedAt;
+      if (obs.endedAt !== null) existing.endedAt = obs.endedAt;
       continue;
     }
     // Replace a launch request with the actual observed Player log event
@@ -143,7 +162,8 @@ export function mergeObservedSessions(
       placeId: obs.placeId, name,
       iconUrl: activityIcon(games, obs.placeId) ?? undefined,
       serverId: obs.serverId,
-      joinedAt: obs.joinedAt, endedAt: obs.endedAt, source: "player-log"
+      joinedAt: obs.joinedAt, connectedAt: obs.connectedAt,
+      endedAt: obs.endedAt, source: "player-log"
     });
   }
   return persist(result);
@@ -176,7 +196,9 @@ export function shortActivityTime(at: number, now = Date.now()): string {
 }
 
 export function activityDuration(entry: ActivityEntry): string | null {
-  if (entry.endedAt === null || entry.source !== "player-log") return null;
-  const minutes = Math.max(0, Math.floor((entry.endedAt - entry.joinedAt) / 60_000));
+  // Playtime only starts after a network connection is observed.
+  if (entry.endedAt === null || entry.connectedAt == null ||
+    entry.source !== "player-log" || entry.endedAt < entry.connectedAt) return null;
+  const minutes = Math.max(0, Math.floor((entry.endedAt - entry.connectedAt) / 60_000));
   return minutes >= 60 ? Math.floor(minutes / 60) + "h " + minutes % 60 + "m" : minutes + "m";
 }
