@@ -4,7 +4,7 @@
   import {
     activityDuration, activityIcon, addActivityMetadata, clearActivityHistory, historyEnabled,
     mergeObservedSessions, readActivityHistory, setHistoryEnabled,
-    shortActivityTime, trackingSince
+    shortActivityTime, trackingSince, trackingEpoch
   } from "./lib/activity";
   import type { ActivityEntry } from "./lib/activity";
   import type { SavedGame } from "./lib/types";
@@ -17,7 +17,6 @@
   let scanning = false;
   let rejoining = false;
   let resolvingPlaceId: number | null = null;
-  let lastRejoinCheck = 0;
   let message = "";
   let error = "";
 
@@ -43,15 +42,19 @@
     scanning = true;
     if (manual) { error = ""; message = ""; }
     try {
+      const epoch = trackingEpoch();
       const since = trackingSince();
       const observed = await recentPlayerSessions(since);
-      // Turning tracking off or clearing history invalidates an in-flight scan.
-      if (!tracking || trackingSince() !== since) return;
+      // The opt-in epoch is stable even as a 7-day scan window advances.
+      // Turning tracking off or clearing history invalidates this scan.
+      if (!tracking || trackingEpoch() !== epoch) return;
       const before = entries.length;
       entries = mergeObservedSessions(entries, observed, games, since);
       if (manual) {
         message = observed.length
-          ? "Read " + observed.length + " recent Player join events. " +
+          ? "Found " + observed.length + " join attempts (" +
+            observed.filter(event => event.connectedAt !== null).length +
+            " with server connections). " +
             Math.max(0, entries.length - before) + " new history entries."
           : "No join events found since tracking was enabled. Roblox logs may vary by version.";
       }
@@ -105,48 +108,52 @@
   async function rejoin(entry: ActivityEntry) {
     if (rejoining) return;
     const now = Date.now();
-    if (lastRejoinCheck > now) {
-      message = "Rejoin lookup is cooling down. You can use Open game instead.";
-      return;
-    }
     rejoining = true;
     error = "";
     message = "";
     try {
-      // Roblox public server listings are paginated and not exhaustive. Only
-      // target the old instance when it is positively found with a free slot.
+      // A positive match in the sampled PUBLIC listing is required before
+      // using an instance ID. This isn't an availability guarantee, because
+      // player counts may change before Roblox processes the launch.
       let target: string | null = null;
-      let explanation = "Opened the game; exact server not verified.";
-      if (entry.serverId && now - entry.joinedAt < 15 * 60_000) {
-        lastRejoinCheck = now + 15_000;
+      let explanation = "Opening the game without a specific server.";
+      const lastSeen = entry.endedAt ?? entry.joinedAt;
+      if (entry.serverId && entry.source === "player-log" &&
+        now - lastSeen >= 0 && now - lastSeen < 2 * 60 * 60_000) {
         try {
           let cursor: string | null = null;
+          const seenCursors = new Set<string>();
           let found = false;
-          for (let page = 0; page < 3; page++) {
+          for (let page = 0; page < 6; page++) {
+            message = "Looking for your previous public server (page " + (page + 1) + " of 6)…";
             const result = await fetchPublicServers(entry.placeId, cursor, false);
             const server = result.data.find(s => s.id.toLowerCase() === entry.serverId?.toLowerCase());
             if (server) {
               found = true;
-              if (server.playing < server.maxPlayers) {
+              if (server.maxPlayers > 0 && server.playing < server.maxPlayers) {
                 target = server.id;
-                explanation = "Opening the verified public server in Roblox.";
+                explanation = "The previous public server appeared to have a free slot when checked. Roblox will attempt to join it.";
               } else {
-                explanation = "Previous server is full; opening the game instead.";
+                explanation = "The previous server was full in the latest sample. Opening the game instead.";
               }
               break;
             }
             cursor = result.nextPageCursor;
-            if (!cursor) break;
+            if (!cursor || seenCursors.has(cursor)) break;
+            seenCursors.add(cursor);
           }
           if (!found) {
-            explanation = "Could not verify that instance in sampled public pages; opening the game instead.";
+            explanation = "Previous instance not found in the sampled public server pages. Opening the game instead.";
           }
         } catch {
-          explanation = "Public server lookup is unavailable; opening the game instead.";
+          explanation = "Public server lookup failed or was rate-limited. Opening the game instead.";
         }
+      } else if (entry.source === "launch-request") {
+        explanation = "This was only a launcher request, not an observed server connection. Opening the game.";
       } else {
-        explanation = "That server entry is older than 15 minutes or has no instance ID. Opening the game instead.";
+        explanation = "Previous server is older than two hours or its instance ID is unavailable. Opening the game.";
       }
+      message = "Opening Roblox…";
       const opened = await onLaunch(entry.placeId, target);
       if (opened) message = explanation;
       else error = "Roblox didn't open. Check the error notification.";
@@ -167,7 +174,7 @@
   <div class="activity-intro">
     <div>
       <strong>{tracking ? "Tracking enabled" : "History is optional"}</strong>
-      <p>Detect join attempts from Roblox Player logs on your Mac or PC. Logs stay local; Thirst doesn't upload them or read your Roblox cookie.</p>
+      <p>Detect join attempts and server connections from local Roblox Player logs. Activity stays on this device; no Roblox cookie or server IP is sent to the interface.</p>
     </div>
     <label class="activity-toggle"><input type="checkbox" checked={tracking} onchange={e => setTracking(e.currentTarget.checked)}/><span class="activity-switch"></span><span>{tracking ? "On" : "Off"}</span></label>
   </div>
@@ -184,13 +191,16 @@
             {:else}
               <span class="activity-placeholder">◈</span>
             {/if}
-            <span class="activity-origin">{entry.source === "player-log" ? "Player log" : "Launch request"}</span>
+            <span class="activity-origin">{entry.source === "launch-request" ? "Launch requested" : entry.connectedAt != null ? "Server connected" : "Join attempted"}</span>
           </div>
           <div class="activity-details">
             <strong title={entry.name}>{entry.name}</strong>
             <small>{shortActivityTime(entry.joinedAt)} · Place {entry.placeId}</small>
+            {#if entry.source === "player-log" && entry.connectedAt == null}
+              <small>Connection not confirmed by Player log</small>
+            {/if}
             {#if activityDuration(entry)}
-              <small>Approx. session: {activityDuration(entry)}</small>
+              <small>Approx. connected time: {activityDuration(entry)}</small>
             {/if}
             <div class="activity-card-actions">
               <button class="btn primary small" disabled={rejoining} onclick={() => void rejoin(entry)}>↺ Rejoin</button>
@@ -204,7 +214,7 @@
         </div>
       {/each}
     </div>
-    <p class="activity-footnote">Click Get title & art to fetch optional public Roblox metadata. Player logs indicate a join attempt, not a guaranteed completed session. Exact-server rejoin checks up to 3 public server pages, then falls back to the place. History keeps at most 80 entries for 30 days.</p>
+    <p class="activity-footnote">A server connection marker is not proof that a game finished loading. Exact-server rejoin checks up to six public server pages and falls back to the place; counts can change during launch. Public title/art lookup happens only when you click it. History keeps up to 80 entries for 30 days.</p>
   {:else}
     <div class="activity-empty">
       <span>◌</span>
