@@ -61,7 +61,7 @@ fn launch_place(
     let url = make_launch_url(place_id, job_id.as_deref())?;
     app.opener()
         .open_url(url, None::<&str>)
-        .map_err(|_| "Could not open Roblox. Make sure Roblox is installed.".to_owned())
+        .map_err(|_| "Could not hand the launch request to Roblox. Check the installed Player and roblox:// handler in Settings → Roblox & Launch.".to_owned())
 }
 
 #[tauri::command]
