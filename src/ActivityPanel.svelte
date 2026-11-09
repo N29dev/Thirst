@@ -13,6 +13,7 @@
   export let onLaunch: (placeId: number, jobId?: string | null) => Promise<boolean>;
 
   let tracking = false;
+  let mounted = false;
   let entries: ActivityEntry[] = [];
   let scanning = false;
   let rejoining = false;
@@ -21,6 +22,7 @@
   let error = "";
 
   onMount(() => {
+    mounted = true;
     tracking = historyEnabled();
     entries = readActivityHistory();
     const onLaunchHistory = () => { entries = readActivityHistory(); };
@@ -32,6 +34,7 @@
       if (tracking && document.visibilityState === "visible") void refresh(false);
     }, 30_000);
     return () => {
+      mounted = false;
       clearInterval(timer);
       window.removeEventListener("thirst:activity-updated", onLaunchHistory);
     };
@@ -47,7 +50,7 @@
       const observed = await recentPlayerSessions(since);
       // The opt-in epoch is stable even as a 7-day scan window advances.
       // Turning tracking off or clearing history invalidates this scan.
-      if (!tracking || trackingEpoch() !== epoch) return;
+      if (!mounted || !tracking || trackingEpoch() !== epoch) return;
       const before = entries.length;
       entries = mergeObservedSessions(entries, observed, games, since);
       if (manual) {
