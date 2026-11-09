@@ -34,6 +34,39 @@ export function launchPlace(placeId: number, jobId: string | null = null): Promi
   return invoke<void>("launch_place", { placeId, jobId });
 }
 
+export type RobloxInstallStatus = {
+  installed: boolean;
+  path: string | null;
+  version: string | null;
+  source: "custom" | "automatic" | "not-found";
+  protocol: "registered" | "missing" | "other-app" | "unverified";
+  running: boolean | null;
+  detail: string;
+  customPath: boolean;
+};
+
+export function robloxInstallStatus(): Promise<RobloxInstallStatus> {
+  return invoke<RobloxInstallStatus>("roblox_install_status");
+}
+
+export function setRobloxInstallPath(path: string | null): Promise<RobloxInstallStatus> {
+  return invoke<RobloxInstallStatus>("set_roblox_install_path", { path });
+}
+
+export function openRobloxInstallFolder(): Promise<void> {
+  return invoke("open_roblox_install_folder");
+}
+
+export function openRobloxDownloadPage(): Promise<void> {
+  return invoke("open_roblox_download_page");
+}
+
+// Process presence is a separate observation, NOT proof a requested game joined.
+export function robloxRunningStatus(): Promise<boolean | null> {
+  return invoke<boolean | null>("roblox_running_status");
+}
+
+
 export function fetchPublicServers(placeId: number, cursor: string | null, authenticated = false): Promise<ServerPage> {
   return invoke<ServerPage>("list_public_servers", { placeId, cursor, authenticated });
 }
