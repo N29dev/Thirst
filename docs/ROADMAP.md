@@ -83,9 +83,11 @@ Reference: [AppleBlox source](https://github.com/AppleBlox/appleblox), [0.9.0 ch
 ### P0 — Next: high-value quality of life, little runtime overhead
 
 **Initial History/Rejoin implementation (Nov 8, 2026):**
-- [x] Opt-in native Player-log join detection from fixed macOS/Windows log paths. Bounded to 12 recent logs × 512 KiB; raw logs, cookies, addresses and other private content never returned to the UI.
+- [x] Opt-in native Player-log join and network-connection detection from fixed macOS/Windows log paths. Bounded to 12 recent logs × 512 KiB; raw logs, cookies, addresses and other private content never returned to the UI. Connection markers are not proof of finished gameplay.
 - [x] Local 30-day / 80-event history with distinct log attempts vs manually opened shortcuts, one-click Refresh and on-demand public title/art lookup. Observations are not proof of a completed join.
-- [x] First rejoin flow: verify matching UUID with a free slot in at most three public server pages when recent (<15 minutes), otherwise explain and open the place. No fake availability claims or background Roblox requests.
+- [x] Fix seven-day rolling scan invalidation and merge connection/disconnect markers without erasing observed data on log-tail truncation; scan local logs once per minute while Thirst is visible on other tabs.
+- [ ] Verify current Player log markers on real macOS and Windows installs, check whether session durations and rejoin outcomes match actual gameplay, and profile long-running scan cost.
+- [x] Rejoin flow: check matching UUID in up to six public server pages for recently observed sessions (last two hours), otherwise explain and open the place. No fake availability claims or background Roblox requests.
 - [ ] Validate on actual Roblox Player versions and capture example logs from both macOS and Windows; adjust patterns, confirm leave timestamps and test complete session/teleport/rejoin flows.
 - [ ] Measure idle cost, rate-limit behavior and rejoin reliability; native log reader currently runs only while Overview is open and tracking is enabled.
 
