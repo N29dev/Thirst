@@ -332,6 +332,7 @@ pub fn run() {
         .manage(server_previews::PreviewCache::default())
         .manage(rovalra::RegionProviderState::default())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             launch_place,
             roblox_install::roblox_install_status,
