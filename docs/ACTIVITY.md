@@ -1,6 +1,6 @@
 # Thirst game history and rejoin (experimental)
 
-History is **opt-in and local-only**. On the Overview page, enable **Game history** and join a Roblox game. While Overview is visible, Thirst scans the bounded tail of recent Roblox **Player** logs every 30 seconds. **Refresh** triggers a manual scan; you can also turn tracking off, clear saved history, and launch games normally without using this feature.
+History is **opt-in and local-only**. On the Overview page, enable **Game history** and join a Roblox game. While Overview is visible, Thirst scans the bounded tail of recent Roblox **Player** logs every 30 seconds. With Thirst open on another tab, it checks every 60 seconds. Both scans stop when the window is hidden, history is disabled, or the app closes. **Refresh** triggers a manual scan; you can also turn tracking off, clear saved history, and launch games normally without using this feature.
 
 ## What is collected
 
@@ -13,7 +13,7 @@ Those paths are also described in [Roblox's official support instructions](https
 
 History is retained in the launcher's existing local browser storage only, at most **80 entries for 30 days**. Tracking is disabled by default. Enabling it starts a new observation window and **doesn't import previous games**. Disabling tracking keeps the existing history until you clear it, while clearing advances the observation window so old log lines aren't repopulated.
 
-**Limits:** A "Joining game" log message is a **join attempt**, not proof the session completed. Thirst now distinguishes a subsequent Player network connection event from an unconfirmed attempt. Even a connection marker **is not proof gameplay finished loading**. Approximate connected time is shown only if the same session has both connection and disconnect markers; otherwise it is omitted. Some Roblox versions, launch methods, log names or permissions may prevent observation. The UI labels log-derived entries separately from Thirst's existing manual "Recently opened" shortcuts. The current implementation observes only when Thirst's **Home/Overview page is visible**; it does not run a persistent background service after the app closes.
+**Limits:** A "Joining game" log message is a **join attempt**, not proof the session completed. Thirst now distinguishes a subsequent Player network connection event from an unconfirmed attempt. Even a connection marker **is not proof gameplay finished loading**. Approximate connected time is shown only if the same session has both connection and disconnect markers; otherwise it is omitted. Some Roblox versions, launch methods, log names or permissions may prevent observation. The UI labels log-derived entries separately from Thirst's existing manual "Recently opened" shortcuts. The current implementation observes while the Thirst window is open and visible (30 seconds on Overview, 60 seconds on other tabs); it does not run a persistent background service after the app closes. Reopening Overview still scans recent logs from the opt-in date, subject to the seven-day native log window.
 
 ### Optional metadata
 
