@@ -194,6 +194,10 @@
     ).slice(0, 10)
     : [];
 
+  function isOverviewVisible(): boolean {
+    return tab === "home";
+  }
+
   onMount(() => {
     reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     games = readLibrary();
@@ -216,14 +220,14 @@
     // file scan, NOT a persistent process or a Roblox network request.
     let passiveScanInFlight = false;
     const passiveHistoryTimer = setInterval(async () => {
-      if (tab === "home" || document.visibilityState !== "visible" ||
+      if (isOverviewVisible() || document.visibilityState !== "visible" ||
         !historyEnabled() || passiveScanInFlight) return;
       passiveScanInFlight = true;
       try {
         const epoch = trackingEpoch();
         const since = trackingSince();
         const observed = await recentPlayerSessions(since);
-        if (tab !== "home" && historyEnabled() && trackingEpoch() === epoch) {
+        if (!isOverviewVisible() && historyEnabled() && trackingEpoch() === epoch) {
           mergeObservedSessions(readActivityHistory(), observed, games, since);
         }
       } catch {
