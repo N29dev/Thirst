@@ -9,14 +9,18 @@
   import thirstAppIcon from "../src-tauri/icons/thirst.svg";
   import FastFlagsPanel from "./FastFlagsPanel.svelte";
   import ActivityPanel from "./ActivityPanel.svelte";
-  import { historyEnabled, readActivityHistory, recordLaunchAttempt } from "./lib/activity";
+  import {
+    historyEnabled, mergeObservedSessions, readActivityHistory,
+    recordLaunchAttempt, trackingEpoch, trackingSince
+  } from "./lib/activity";
   import {readRecentLaunches, recordRecentLaunch, clearRecentLaunches, recentPlaceName} from "./lib/recent";
   import type {RecentLaunch} from "./lib/recent";
   import {exportLibraryJson, importLibraryJson, mergeImportedLibrary} from "./lib/library-backup";
   import {
     beginRobloxConsent, cancelRobloxLogin, connectedRobloxAccount,
     disconnectRobloxAccount, discoverSubplaces, fetchPublicServers, fetchServerAvatarPreview, fetchServerAvatarPreviews,
-    finishRobloxLogin, launchPlace, lockRobloxSession, lookupGame, lookupRoValraRegions, openRobloxLogin, platformName, pollRobloxLoginStatus
+    finishRobloxLogin, launchPlace, lockRobloxSession, lookupGame, lookupRoValraRegions, openRobloxLogin, platformName, pollRobloxLoginStatus,
+    recentPlayerSessions
   } from "./lib/backend";
   import type { ConnectedAccount, ThirstUpdateCheck } from "./lib/backend";
   import { checkThirstUpdate, openThirstReleases, openThirstDevBuilds } from "./lib/backend";
@@ -207,8 +211,30 @@
       releaseCheckTimer = setTimeout(() => void checkUpdates(true), 2500);
     }
     platformName().then(value => platform = value).catch(() => platform = "Desktop");
-    // Prevent a pending notification callback from outliving the desktop window.
+    // While Thirst is open on another tab, keep opt-in local history fresh.
+    // Home already scans every 30 seconds. This is a 60-second fixed-folder
+    // file scan, NOT a persistent process or a Roblox network request.
+    let passiveScanInFlight = false;
+    const passiveHistoryTimer = setInterval(async () => {
+      if (tab === "home" || document.visibilityState !== "visible" ||
+        !historyEnabled() || passiveScanInFlight) return;
+      passiveScanInFlight = true;
+      try {
+        const epoch = trackingEpoch();
+        const since = trackingSince();
+        const observed = await recentPlayerSessions(since);
+        if (historyEnabled() && trackingEpoch() === epoch) {
+          mergeObservedSessions(readActivityHistory(), observed, games, since);
+        }
+      } catch {
+        // History monitoring is optional and must never disrupt a game launch.
+      } finally {
+        passiveScanInFlight = false;
+      }
+    }, 60_000);
+    // Prevent pending callbacks from outliving the desktop window.
     return () => {
+      clearInterval(passiveHistoryTimer);
       if (toastTimeout) clearTimeout(toastTimeout);
       if (consentTimer) clearInterval(consentTimer);
       if (nativeLoginTimer) clearInterval(nativeLoginTimer);
