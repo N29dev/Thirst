@@ -24,6 +24,8 @@ pub struct PlayerSession {
     place_id: u64,
     server_id: String,
     joined_at: i64,
+    // A network connection event, not proof that gameplay finished loading.
+    connected_at: Option<i64>,
     ended_at: Option<i64>,
 }
 
@@ -59,9 +61,15 @@ fn joined_place(line: &str) -> Option<(u64, String)> {
     Some((place_id, uuid))
 }
 
+fn is_connected_line(line: &str) -> bool {
+    // A Roblox Player network marker; no addresses or ports leave native Rust.
+    line.contains("[FLog::Network] serverId:")
+}
+
 fn is_leave_line(line: &str) -> bool {
     line.contains("Time to disconnect replication data:")
         || line.contains("leaveUGCGameInternal")
+        || line.contains("returnToLuaApp")
 }
 
 fn parse_sessions(content: &str, since_ms: i64, now_ms: i64) -> Vec<PlayerSession> {
@@ -72,13 +80,29 @@ fn parse_sessions(content: &str, since_ms: i64, now_ms: i64) -> Vec<PlayerSessio
         if at < since_ms || at > now_ms + 60_000 { continue; }
 
         if let Some((place_id, server_id)) = joined_place(line) {
+            // Duplicate join messages are not new sessions. Compare before
+            // closing the previous entry, including short teleport retries.
+            if sessions.last().is_some_and(|prev| prev.place_id == place_id
+                && prev.server_id == server_id && prev.ended_at.is_none()
+                && at >= prev.joined_at && at - prev.joined_at < 15_000) {
+                current = Some(sessions.len() - 1);
+                continue;
+            }
             if let Some(idx) = current {
                 if sessions[idx].ended_at.is_none() && at >= sessions[idx].joined_at {
                     sessions[idx].ended_at = Some(at);
                 }
             }
-            sessions.push(PlayerSession { place_id, server_id, joined_at: at, ended_at: None });
+            sessions.push(PlayerSession {
+                place_id, server_id, joined_at: at, connected_at: None, ended_at: None
+            });
             current = Some(sessions.len() - 1);
+        } else if is_connected_line(line) {
+            if let Some(idx) = current {
+                if sessions[idx].connected_at.is_none() && at >= sessions[idx].joined_at {
+                    sessions[idx].connected_at = Some(at);
+                }
+            }
         } else if is_leave_line(line) {
             if let Some(idx) = current.take() {
                 if at >= sessions[idx].joined_at && sessions[idx].ended_at.is_none() {
@@ -189,6 +213,7 @@ mod tests {
         assert_eq!(result[0].place_id, 1818);
         assert_eq!(result[0].server_id, "550e8400-e29b-41d4-a716-446655440000");
         assert_eq!(result[0].ended_at, Some(start + 179_800));
+        assert_eq!(result[0].connected_at, None);
         let json = serde_json::to_string(&result).unwrap();
         assert!(!json.contains("10.2.3.4"));
         assert!(!json.contains("FLog"));
@@ -205,6 +230,38 @@ mod tests {
         assert!(parse_sessions(input, after, after + 60_000).is_empty());
         assert!(!looks_like_player_log(Path::new("RobloxStudio_2026.log")));
         assert!(looks_like_player_log(Path::new("0.500_Player_123.log")));
+    }
+
+    #[test]
+    fn marks_connection_separately_from_attempt_and_keeps_server_ip_private() {
+        let input = concat!(
+            "2026-11-08T18:00:00Z [FLog::Output] ! Joining game '550e8400-e29b-41d4-a716-446655440000' place 1818 at 10.1.1.1\n",
+            "2026-11-08T18:00:15Z [FLog::Network] serverId: 203.0.113.9|55413\n",
+            "2026-11-08T18:04:00Z [FLog::Network] Time to disconnect replication data: 125\n",
+        );
+        let start = line_timestamp_ms(input.lines().next().unwrap()).unwrap();
+        let sessions = parse_sessions(input, start, start + 600_000);
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].connected_at, Some(start + 15_000));
+        assert_eq!(sessions[0].ended_at, Some(start + 240_000));
+        let serialized = serde_json::to_string(&sessions).unwrap();
+        assert!(serialized.contains("connectedAt"));
+        assert!(!serialized.contains("203.0.113.9"));
+        assert!(!serialized.contains("10.1.1.1"));
+    }
+
+    #[test]
+    fn duplicate_attempt_and_orphan_network_marker_are_ignored() {
+        let input = concat!(
+            "2026-11-08T18:00:00Z [FLog::Network] serverId: 203.0.113.9|99\n",
+            "2026-11-08T18:00:01Z [FLog::Output] ! Joining game '550e8400-e29b-41d4-a716-446655440000' place 1818 at 10.1.1.1\n",
+            "2026-11-08T18:00:05Z [FLog::Output] ! Joining game '550e8400-e29b-41d4-a716-446655440000' place 1818 at 10.1.1.1\n"
+        );
+        let start = line_timestamp_ms(input.lines().next().unwrap()).unwrap();
+        let sessions = parse_sessions(input, start, start + 60_000);
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].connected_at, None);
+        assert_eq!(sessions[0].ended_at, None);
     }
 
     #[test]
