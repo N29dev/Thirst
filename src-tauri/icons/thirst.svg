@@ -15,11 +15,6 @@
       <stop offset="0" stop-color="#5d42ff" stop-opacity=".85"/>
       <stop offset="1" stop-color="#4842cd" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="rim" x1=".12" y1=".06" x2=".93" y2=".96">
-      <stop offset="0" stop-color="#f9fdff"/>
-      <stop offset=".45" stop-color="#c3c0ff"/>
-      <stop offset="1" stop-color="#e8a9ff"/>
-    </linearGradient>
     <linearGradient id="liquid" x1=".25" y1="0" x2=".8" y2="1">
       <stop offset="0" stop-color="#fffbff"/>
       <stop offset=".38" stop-color="#bbb5ff"/>
@@ -43,11 +38,10 @@
       <path d="M512 197 C492 222 340 410 304 516 C259 651 310 778 418 815 C508 847 618 819 689 731 C759 639 727 530 678 444 C638 372 555 241 512 197 Z"/>
     </clipPath>
   </defs>
-  <rect x="37" y="37" width="950" height="950" rx="210" fill="#dfdfff"/>
   <g clip-path="url(#tileclip)">
-    <rect x="46" y="46" width="932" height="932" fill="url(#tile)"/>
-    <rect x="46" y="46" width="932" height="932" fill="url(#magenta)"/>
-    <rect x="46" y="46" width="932" height="932" fill="url(#blueglow)"/>
+    <rect x="37" y="37" width="950" height="950" fill="url(#tile)"/>
+    <rect x="37" y="37" width="950" height="950" fill="url(#magenta)"/>
+    <rect x="37" y="37" width="950" height="950" fill="url(#blueglow)"/>
     <path d="M40 410 C280 350 340 140 600 37 L37 37 Z" fill="#748ed9" opacity=".13"/>
     <path d="M410 985 C680 720 865 784 990 695 L990 1000 Z" fill="#c076ed" opacity=".13"/>
     <g transform="rotate(-19 514 528)">
@@ -66,8 +60,5 @@
       <path d="M715 463 A344 114 0 0 1 860 542" fill="none" stroke="#ffe5ff" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
     </g>
     <path d="M463 374 l45 -59" stroke="#fffaff" stroke-width="33" stroke-linecap="round" opacity=".88"/>
-    <path d="M150 110 C218 71 319 74 402 75" stroke="#ffffff" stroke-width="15" stroke-opacity=".26" fill="none" stroke-linecap="round"/>
   </g>
-  <rect x="45" y="45" width="934" height="934" rx="203" fill="none" stroke="url(#rim)" stroke-width="23"/>
-  <rect x="62" y="62" width="900" height="900" rx="188" fill="none" stroke="#fdfbff" stroke-opacity=".25" stroke-width="4"/>
 </svg>
