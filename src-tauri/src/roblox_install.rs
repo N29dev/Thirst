@@ -97,18 +97,20 @@ fn candidates() -> Vec<PathBuf> {
         if let Some(home) = std::env::var_os("HOME") {
             paths.push(PathBuf::from(home).join("Applications/Roblox.app"));
         }
-        // An indexed Spotlight lookup finds moved/renamed installations
-        // without a full-disk walk. Output is bounded and every path validated.
-        if let Ok(result) = Command::new("/usr/bin/mdfind")
-            .arg("kMDItemFSName == 'Roblox.app'")
-            .output()
-        {
-            if result.status.success() {
-                for line in String::from_utf8_lossy(
-                    &result.stdout[..result.stdout.len().min(24_576)]
-                ).lines().take(30) {
-                    if line.ends_with("/Roblox.app") {
-                        paths.push(PathBuf::from(line));
+        // Avoid Spotlight overhead when an official standard install exists.
+        // Otherwise use a bounded indexed lookup, never a full disk walk.
+        if !paths.iter().any(|path| valid_candidate(path)) {
+            if let Ok(result) = Command::new("/usr/bin/mdfind")
+                .arg("kMDItemFSName == 'Roblox.app'")
+                .output()
+            {
+                if result.status.success() {
+                    for line in String::from_utf8_lossy(
+                        &result.stdout[..result.stdout.len().min(24_576)]
+                    ).lines().take(30) {
+                        if line.ends_with("/Roblox.app") {
+                            paths.push(PathBuf::from(line));
+                        }
                     }
                 }
             }
@@ -148,8 +150,21 @@ fn protocol_registration() -> &'static str {
         ] {
             if let Ok(output) = Command::new("reg").args(["query", key, "/ve"]).output() {
                 if output.status.success() {
-                    let value = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
-                    if value.contains("roblox") { return "registered"; }
+                    // Only inspect the registry VALUE, not the key header
+                    // (which itself contains "roblox" even for a wrong handler).
+                    let text = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
+                    for line in text.lines() {
+                        if let Some(value) = line.split_once("reg_sz")
+                            .map(|(_, value)| value)
+                            .or_else(|| line.split_once("reg_expand_sz").map(|(_, value)| value))
+                        {
+                            if value.contains("robloxplayer") || value.contains("roblox") {
+                                return "registered";
+                            }
+                            return "other-app";
+                        }
+                    }
+                    return "unverified";
                 }
             }
         }
